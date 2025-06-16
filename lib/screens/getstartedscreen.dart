@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:lbn/screens/loginoptionsscreen.dart'; // Ensure this file exists and LoginScreen is imported properly
+import 'package:lbn/screens/loginscreen.dart';
 
 class GetStartedScreen extends StatefulWidget {
   const GetStartedScreen({super.key});
@@ -41,11 +43,7 @@ class _GetStartedScreenState extends State<GetStartedScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Status bar
-              
               const SizedBox(height: 40),
-              
-              // Title and subtitle
               const Text(
                 'Get Started!',
                 style: TextStyle(
@@ -54,17 +52,15 @@ class _GetStartedScreenState extends State<GetStartedScreen>
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               const Text(
-                'Connect, network, grow, invest,\nrepeat wisely.',
+                'Connect, network, grow and invest wisely.',
                 style: TextStyle(
                   color: Colors.white70,
-                  fontSize: 16,
+                  fontSize: 15,
                   height: 1.4,
                 ),
               ),
-              
-              // Animated ripple effect with LBN text
               Expanded(
                 child: Center(
                   child: AnimatedBuilder(
@@ -73,20 +69,23 @@ class _GetStartedScreenState extends State<GetStartedScreen>
                       return Stack(
                         alignment: Alignment.center,
                         children: [
-                          // Concentric circles
                           for (int i = 0; i < 8; i++)
                             Container(
-                              width: 80 + (i * 30) * (1 + _rippleAnimation.value * 0.3),
-                              height: 80 + (i * 30) * (1 + _rippleAnimation.value * 0.3),
+                              width: 80 +
+                                  (i * 30) *
+                                      (1 + _rippleAnimation.value * 0.3),
+                              height: 80 +
+                                  (i * 30) *
+                                      (1 + _rippleAnimation.value * 0.3),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.1 + (i * 0.02)),
+                                  color: Colors.white
+                                      .withOpacity(0.1 + (i * 0.02)),
                                   width: 1,
                                 ),
                               ),
                             ),
-                          // LBN text
                           Container(
                             width: 80,
                             height: 80,
@@ -111,14 +110,17 @@ class _GetStartedScreenState extends State<GetStartedScreen>
                   ),
                 ),
               ),
-              
-              // Buttons
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/login');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoginScreen(),
+                          ),
+                        );
                       },
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.white),
@@ -141,7 +143,12 @@ class _GetStartedScreenState extends State<GetStartedScreen>
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/signup');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegistrationOptionsPage(),
+                          ),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
