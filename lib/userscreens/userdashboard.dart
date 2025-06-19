@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lbn/screens/loginscreen.dart';
 import 'package:lbn/userscreens/businessprofile.dart';
 import 'package:lbn/userscreens/eventsmembers.dart';
+import 'package:lbn/userscreens/meetingsuser.dart';
 import 'package:lbn/userscreens/memberprofile.dart';
 import 'package:lbn/userscreens/usermembers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -320,7 +321,7 @@ class _UserDashboardState extends State<UserDashboard> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) =>  EventsPage()),
+                      MaterialPageRoute(builder: (context) => const EventsPage()),
                     );
                   },
                 ),
@@ -328,6 +329,12 @@ class _UserDashboardState extends State<UserDashboard> {
                   'Meetings',
                   Icons.meeting_room,
                   Colors.orange,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) =>  MeetingsPage()),
+                    );
+                  },
                 ),
                 _buildFeatureCard(
                   'One-to-One',

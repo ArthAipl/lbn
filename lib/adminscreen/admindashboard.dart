@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:lbn/adminscreen/eventsadmin.dart';
 import 'package:lbn/adminscreen/grupmembers.dart';
+import 'package:lbn/adminscreen/meetingsadmin.dart';
 import 'package:lbn/adminscreen/membersrequests.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lbn/adminscreen/adminprofilepage.dart';
 import 'package:lbn/screens/loginscreen.dart';
 import 'package:flutter/services.dart';
-// Added import for EventsHomePage
+
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
@@ -112,12 +113,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case 'Events':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const EventsHomePage
-          ()), // Updated to EventsHomePage
+          MaterialPageRoute(builder: (context) => const EventsHomePage()),
         );
         break;
       case 'Meetings':
-        _showFeatureComingSoon('Meetings');
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => MeetingsAdmin()), // Updated to navigate to MeetingAdmin
+        );
         break;
       case 'Gallery':
         _showFeatureComingSoon('Gallery');
