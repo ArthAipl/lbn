@@ -4,6 +4,7 @@ import 'package:lbn/userscreens/businessprofile.dart';
 import 'package:lbn/userscreens/eventsmembers.dart';
 import 'package:lbn/userscreens/meetingsuser.dart';
 import 'package:lbn/userscreens/memberprofile.dart';
+import 'package:lbn/userscreens/onetwooone.dart';
 import 'package:lbn/userscreens/usermembers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -193,16 +194,45 @@ class _UserDashboardState extends State<UserDashboard> {
         ),
         onTap: () async {
           if (isLogout) {
-            // Clear user data from SharedPreferences
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.clear(); // Clears all stored data (e.g., auth token)
-
-            // Navigate to LoginScreen and remove all previous routes
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-              (Route<dynamic> route) => false,
+            // Show confirmation dialog
+            bool? confirm = await showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Logout'),
+                content: const Text('Are you sure you want to log out?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Logout'),
+                  ),
+                ],
+              ),
             );
+
+            if (confirm == true) {
+              try {
+                // Clear specific SharedPreferences keys
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('auth_token');
+                await prefs.remove('user_id');
+                // Add other specific keys to clear as needed
+
+                // Navigate to LoginScreen and remove all previous routes
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (Route<dynamic> route) => false,
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error during logout: $e')),
+                );
+              }
+            }
           } else if (isNavigationItem) {
             Navigator.pop(context); // Close the drawer
             if (title == 'Members') {
@@ -332,7 +362,7 @@ class _UserDashboardState extends State<UserDashboard> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) =>  MeetingsPage()),
+                      MaterialPageRoute(builder: (context) => const MeetingsPage()),
                     );
                   },
                 ),
@@ -340,6 +370,12 @@ class _UserDashboardState extends State<UserDashboard> {
                   'One-to-One',
                   Icons.person_add,
                   Colors.purple,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) =>  OneToOnePage()),
+                    );
+                  },
                 ),
               ],
             ),

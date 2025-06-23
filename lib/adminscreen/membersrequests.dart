@@ -14,6 +14,7 @@ class MemberApprovalScreen extends StatefulWidget {
 class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
   List<Member> members = [];
   bool isLoading = true;
+  bool _isUpdatingStatus = false; // Added for status update loading state
   String? groupCode;
   String errorMessage = '';
   int currentStatusFilter = 0; // 0 = pending, 1 = approved, 2 = rejected, -1 = all
@@ -46,7 +47,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
     } catch (e) {
       debugPrint('Error in _loadGroupCodeAndMembers: ${e.toString()}');
       setState(() {
-        errorMessage = 'Error loading data: ${e.toString()}';
+        errorMessage = 'Error loading data. Please try again.';
         isLoading = false;
       });
     }
@@ -58,7 +59,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
         isLoading = true;
         errorMessage = '';
       });
-      
+
       debugPrint('Fetching members for group code: $groupCode');
       final response = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/member'));
 
@@ -67,7 +68,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
         final decoded = json.decode(response.body);
 
         if (decoded is! Map<String, dynamic> || !decoded.containsKey('members')) {
-          throw Exception('Unexpected response format: missing members array');
+          throw Exception('Unexpected response format: missing or invalid members array');
         }
 
         final List<dynamic> data = decoded['members'];
@@ -90,22 +91,24 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
       } else {
         debugPrint('Failed to load members. Status code: ${response.statusCode}');
         setState(() {
-          errorMessage = 'Failed to load members. Status code: ${response.statusCode}';
+          errorMessage = 'Failed to load members. Please try again.';
           isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('Error in _fetchMembers: ${e.toString()}');
       setState(() {
-        errorMessage = 'Error fetching members: ${e.toString()}';
+        errorMessage = 'Error fetching members. Please try again.';
         isLoading = false;
       });
     }
   }
 
   Future<void> _updateMemberStatus(Member member, int newStatus) async {
+    if (_isUpdatingStatus) return; // Debounce rapid updates
     try {
       debugPrint('Updating member ${member.id} status to $newStatus');
+      setState(() => _isUpdatingStatus = true);
       final response = await http.put(
         Uri.parse('https://tagai.caxis.ca/public/api/member/${member.id}'),
         headers: {'Content-Type': 'application/json'},
@@ -114,10 +117,8 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
 
       if (response.statusCode == 200) {
         debugPrint('Member ${member.id} status updated successfully');
-        
-        // Refresh the list after updating
-        _fetchMembers();
-
+        await _fetchMembers();
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -128,32 +129,40 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
-            margin: EdgeInsets.only(
-              bottom: MediaQuery.of(context).size.height - 100,
-              left: 20,
-              right: 20,
-            ),
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           ),
         );
       } else {
         debugPrint('Failed to update member status. Status code: ${response.statusCode}');
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update member status. Status code: ${response.statusCode}'),
+            content: const Text('Failed to update member. Please try again.'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           ),
         );
       }
     } catch (e) {
       debugPrint('Error updating member status: ${e.toString()}');
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error updating member status: ${e.toString()}'),
+          content: const Text('An error occurred. Please try again.'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         ),
       );
+    } finally {
+      setState(() => _isUpdatingStatus = false);
     }
   }
 
@@ -181,6 +190,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false, // Prevent resizing issues
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         leading: IconButton(
@@ -327,8 +337,12 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
           final member = members[index];
           return MemberCard(
             member: member,
-            onApprove: currentStatusFilter == 0 ? () => _updateMemberStatus(member, 1) : null,
-            onReject: currentStatusFilter == 0 ? () => _updateMemberStatus(member, 2) : null,
+            onApprove: currentStatusFilter == 0 && !_isUpdatingStatus
+                ? () => _updateMemberStatus(member, 1)
+                : null,
+            onReject: currentStatusFilter == 0 && !_isUpdatingStatus
+                ? () => _updateMemberStatus(member, 2)
+                : null,
             showActions: currentStatusFilter == 0,
           );
         },

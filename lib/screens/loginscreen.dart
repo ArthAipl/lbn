@@ -46,8 +46,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _saveUserData(Map<String, dynamic> userData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_id', userData['M_ID']?.toString() ?? '');
-      await prefs.setString('user_name', userData['Name'] ?? '');
+      await prefs.setString('user_id', userData['G_ID']?.toString() ?? '');
+      await prefs.setString('user_name', userData['name'] ?? '');
       await prefs.setString('user_phone', userData['number'] ?? '');
       await prefs.setString('user_email', userData['email'] ?? '');
       await prefs.setInt('user_role', int.tryParse(userData['role_id']?.toString() ?? '') ?? 0);
@@ -85,16 +85,25 @@ class _LoginScreenState extends State<LoginScreen> {
       final responseData = json.decode(response.body);
 
       if (response.statusCode == 200) {
-        if (responseData['status'] == true || responseData['status'] == 1) {
-          if (responseData['data'] == null) {
-            setState(() {
-              _errorMessage = 'Invalid response: No user data received';
-            });
-            debugPrint('Error: No user data in response');
-            return;
-          }
+        // Check if responseData['data'] exists
+        if (responseData['data'] == null) {
+          setState(() {
+            _errorMessage = 'Invalid response: No user data received';
+          });
+          debugPrint('Error: No user data in response');
+          return;
+        }
 
-          final userData = responseData['data'];
+        final userData = responseData['data'];
+        // Check the nested 'status' field in the data object
+        if (userData['status'] == "0") {
+          setState(() {
+            _errorMessage = 'Login denied: Account is inactive or disabled.';
+          });
+          debugPrint('Login denied: Status is 0');
+          return;
+        } else if (userData['status'] == "1") {
+          // Proceed with login if nested status is "1"
           final userRole = int.tryParse(userData['role_id']?.toString() ?? '');
 
           if (userRole == null) {
@@ -126,15 +135,10 @@ class _LoginScreenState extends State<LoginScreen> {
             debugPrint('Error: Unknown user role: $userRole');
           }
         } else {
-          String errorMsg = responseData['message'] ?? 'Login failed';
-          if (responseData['errors'] != null) {
-            final errors = responseData['errors'] as Map<String, dynamic>;
-            errorMsg = errors.values.join(', ');
-          }
           setState(() {
-            _errorMessage = errorMsg;
+            _errorMessage = 'Invalid status in response';
           });
-          debugPrint('Login failed: $errorMsg');
+          debugPrint('Error: Invalid status value: ${userData['status']}');
         }
       } else {
         String errorMsg = responseData['message'] ?? 'Server error';
