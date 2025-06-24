@@ -24,7 +24,6 @@ class AppTheme {
     ),
     appBarTheme: const AppBarTheme(
       elevation: 0,
-      centerTitle: true,
       backgroundColor: Colors.black,
       foregroundColor: Colors.white,
       titleTextStyle: TextStyle(
@@ -132,6 +131,7 @@ class MeetingRequest {
   final Member fromMember;
   final Member toMember;
   final String toMID;
+  final String fromMID;
   final List<String> image;
 
   MeetingRequest({
@@ -145,6 +145,7 @@ class MeetingRequest {
     required this.fromMember,
     required this.toMember,
     required this.toMID,
+    required this.fromMID,
     required this.image,
   });
 
@@ -163,6 +164,7 @@ class MeetingRequest {
     }
 
     final toMID = json['To_MID']?.toString() ?? '';
+    final fromMID = json['From_MID']?.toString() ?? '';
     List<String> images = [];
     if (json['Image'] != null) {
       if (json['Image'] is List) {
@@ -184,6 +186,7 @@ class MeetingRequest {
         fromMember: Member.fromJson(json['from_member'] as Map<String, dynamic>),
         toMember: Member.fromJson(json['to_member'] as Map<String, dynamic>),
         toMID: toMID,
+        fromMID: fromMID,
         image: images,
       );
     } catch (e) {
@@ -192,7 +195,7 @@ class MeetingRequest {
   }
 }
 
-// Custom App Bar Widget - Now Black
+// Custom App Bar Widget
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
@@ -222,7 +225,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       backgroundColor: Colors.black,
       elevation: 2,
-      centerTitle: true,
       leading: showBackButton
           ? leading ??
               IconButton(
@@ -404,7 +406,7 @@ class EmptyStateWidget extends StatelessWidget {
   }
 }
 
-// OneToOnePage
+// OneToOnePage - Team Members Page
 class OneToOnePage extends StatefulWidget {
   const OneToOnePage({super.key});
 
@@ -555,7 +557,7 @@ class _OneToOnePageState extends State<OneToOnePage> {
       _selectedIndex = index;
     });
     if (index == 0 && loggedInUserMID != null && loggedInGID != null) {
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ScheduleMeetingsPage(
@@ -565,10 +567,10 @@ class _OneToOnePageState extends State<OneToOnePage> {
         ),
       );
     } else if (index == 1 && loggedInUserMID != null && loggedInGID != null) {
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => RequestsPage(
+          builder: (context) => HistoryPage(
             loggedInUserMID: loggedInUserMID,
             loggedInGID: loggedInGID,
           ),
@@ -582,41 +584,44 @@ class _OneToOnePageState extends State<OneToOnePage> {
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
       appBar: CustomAppBar(
-        title: 'Team Members',
-        showBackButton: false,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-              onPressed: () {
-                if (loggedInUserMID != null && loggedInGID != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => RequestsPage(
-                        loggedInUserMID: loggedInUserMID,
-                        loggedInGID: loggedInGID,
-                      ),
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('User information missing. Please try again later.'),
-                      backgroundColor: AppTheme.errorColor,
-                    ),
-                  );
-                }
-              },
-            ),
-          ),
-        ],
+  title: 'One-2-One Meeting',
+  showBackButton: true, // Enable back button
+  leading: IconButton(
+    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+    onPressed: () {
+      Navigator.pop(context);
+    },
+  ),
+  actions: [
+    Container(
+      margin: const EdgeInsets.only(right: 8),
+    
+      child: IconButton(
+        icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+        onPressed: () {
+          if (loggedInUserMID != null && loggedInGID != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => RequestsPage(
+                  loggedInUserMID: loggedInUserMID,
+                  loggedInGID: loggedInGID,
+                ),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('User information missing. Please try again later.'),
+                backgroundColor: AppTheme.errorColor,
+              ),
+            );
+          }
+        },
       ),
+    ),
+  ],
+),
       body: RefreshIndicator(
         onRefresh: _loadGropCodeAndMembers,
         color: Colors.black,
@@ -659,7 +664,7 @@ class _OneToOnePageState extends State<OneToOnePage> {
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 16,
                                 mainAxisSpacing: 16,
-                                childAspectRatio: 0.8,
+                                childAspectRatio: 0.85, // Fixed aspect ratio to prevent overflow
                               ),
                               itemCount: filteredMembers.length,
                               itemBuilder: (context, index) {
@@ -736,16 +741,16 @@ class _OneToOnePageState extends State<OneToOnePage> {
           }
         },
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12), // Reduced padding
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 64,
-                height: 64,
+                width: 48, // Reduced size
+                height: 48,
                 decoration: BoxDecoration(
                   color: Colors.black,
-                  borderRadius: BorderRadius.circular(32),
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.3),
@@ -759,17 +764,17 @@ class _OneToOnePageState extends State<OneToOnePage> {
                     member.name.isNotEmpty ? member.name[0].toUpperCase() : 'M',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 24,
+                      fontSize: 20, // Reduced font size
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8), // Reduced spacing
               Text(
                 member.name,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 14, // Reduced font size
                   fontWeight: FontWeight.w600,
                   color: Colors.black87,
                 ),
@@ -777,30 +782,30 @@ class _OneToOnePageState extends State<OneToOnePage> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 member.email,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 10, // Reduced font size
                   color: Colors.grey[600],
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 member.phone,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 10, // Reduced font size
                   color: Colors.grey[600],
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 12),
-              Container(
+              const SizedBox(height: 8), // Reduced spacing
+              SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
@@ -828,13 +833,13 @@ class _OneToOnePageState extends State<OneToOnePage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.accentColor,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 6), // Reduced padding
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   child: const Text(
                     'Arrange Meeting',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 10, // Reduced font size
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -845,6 +850,482 @@ class _OneToOnePageState extends State<OneToOnePage> {
         ),
       ),
     );
+  }
+}
+
+// NEW: History Page - Shows meetings with Status "3"
+class HistoryPage extends StatefulWidget {
+  final String? loggedInUserMID;
+  final String? loggedInGID;
+
+  const HistoryPage({super.key, this.loggedInUserMID, this.loggedInGID});
+
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  List<MeetingRequest> historyMeetings = [];
+  bool isLoading = true;
+  String? errorMessage;
+  int _selectedIndex = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistoryMeetings();
+  }
+
+  Future<void> _loadHistoryMeetings() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      String? mId = widget.loggedInUserMID;
+      String? gId = widget.loggedInGID;
+      
+      if (mId == null || gId == null) {
+        final storedGID = prefs.getString('user_id');
+        final storedEmail = prefs.getString('user_email');
+        if (storedGID == null || storedGID.trim().isEmpty) {
+          setState(() {
+            isLoading = false;
+            errorMessage = 'No group ID found. Please try again later.';
+          });
+          return;
+        }
+        
+        final memberResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/member'));
+        if (memberResponse.statusCode == 200) {
+          final memberData = json.decode(memberResponse.body);
+          List<dynamic> members = memberData is Map<String, dynamic> && memberData.containsKey('members')
+              ? memberData['members']
+              : [];
+          final userMember = members
+              .map((json) => Member.fromJson(json as Map<String, dynamic>))
+              .firstWhere(
+                (member) => member.email == storedEmail,
+                orElse: () => Member(
+                  id: 0,
+                  name: '',
+                  email: '',
+                  phone: '',
+                  gropCode: '',
+                  status: 0,
+                  address: '',
+                  createdAt: '',
+                ),
+              );
+          mId = userMember.id != 0 ? userMember.id.toString() : null;
+          gId = storedGID.trim();
+        } else {
+          setState(() {
+            isLoading = false;
+            errorMessage = 'Failed to fetch user information: HTTP ${memberResponse.statusCode}';
+          });
+          return;
+        }
+      }
+
+      if (mId == null || mId.trim().isEmpty) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'No user ID found. Please try again later.';
+        });
+        return;
+      }
+
+      final response = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/one2one'));
+      debugPrint('History API Response Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        debugPrint('History API Response: $jsonData');
+
+        List<dynamic> data;
+        if (jsonData is List) {
+          data = jsonData;
+        } else if (jsonData is Map<String, dynamic> && jsonData.containsKey('requests')) {
+          data = jsonData['requests'] is List ? jsonData['requests'] : [];
+        } else {
+          data = [];
+        }
+
+        try {
+          final historyList = data
+              .map((json) {
+                try {
+                  return MeetingRequest.fromJson(json as Map<String, dynamic>);
+                } catch (e) {
+                  debugPrint('Error parsing individual history meeting: $e');
+                  return null;
+                }
+              })
+              .where((meeting) => meeting != null)
+              .cast<MeetingRequest>()
+              .where((meeting) => 
+                  meeting.status == '3' && 
+                  (meeting.fromMID == mId || meeting.toMID == mId))
+              .toList();
+
+          setState(() {
+            historyMeetings = historyList;
+            isLoading = false;
+            errorMessage = null;
+          });
+        } catch (e) {
+          setState(() {
+            isLoading = false;
+            errorMessage = 'Error processing history meetings: $e';
+          });
+        }
+      } else {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Failed to load history meetings: HTTP ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Error fetching history meetings: $e';
+      });
+    }
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    if (index == 0 && widget.loggedInUserMID != null && widget.loggedInGID != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ScheduleMeetingsPage(
+            loggedInUserMID: widget.loggedInUserMID,
+            loggedInGID: widget.loggedInGID,
+          ),
+        ),
+      );
+    } else if (index == 1) {
+      // Already on history page
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.surfaceColor,
+      appBar: CustomAppBar(
+        title: 'Meeting History',
+        onBackPressed: () {
+          // Navigate back to Team Members page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const OneToOnePage()),
+          );
+        },
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '${historyMeetings.length}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadHistoryMeetings,
+        color: Colors.black,
+        child: isLoading
+            ? const LoadingWidget(message: 'Loading meeting history...')
+            : errorMessage != null
+                ? ErrorWidget(
+                    message: errorMessage!,
+                    onRetry: _loadHistoryMeetings,
+                  )
+                : historyMeetings.isEmpty
+                    ? const EmptyStateWidget(
+                        title: 'No Meeting History',
+                        message: 'You have no completed meetings yet',
+                        icon: Icons.history,
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: historyMeetings.length,
+                        itemBuilder: (context, index) {
+                          final meeting = historyMeetings[index];
+                          return _buildHistoryCard(meeting);
+                        },
+                      ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.schedule_outlined),
+              activeIcon: Icon(Icons.schedule),
+              label: 'Meetings',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_outlined),
+              activeIcon: Icon(Icons.history),
+              label: 'History',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: Colors.black,
+          unselectedItemColor: Colors.grey[600],
+          backgroundColor: Colors.white,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          onTap: _onItemTapped,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryCard(MeetingRequest meeting) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.check_circle,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Completed Meeting',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          'With ${meeting.toMember.name}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'COMPLETED',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.accentColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    _buildInfoRow(Icons.person_outline, 'From', '${meeting.fromMember.name} (${meeting.fromMember.email})'),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(Icons.location_on_outlined, 'Place', meeting.place),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(Icons.calendar_today_outlined, 'Date', meeting.date),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(Icons.access_time_outlined, 'Time', meeting.time),
+                  ],
+                ),
+              ),
+              if (meeting.image.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Meeting Images',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: meeting.image.length,
+                    itemBuilder: (context, index) {
+                      final imageUrl = meeting.image[index];
+                      return Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: _buildImageWidget(imageUrl),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[600]),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[700],
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageWidget(String imageUrl) {
+    if (imageUrl.startsWith('data:image') || RegExp(r'^[A-Za-z0-9+/=]+$').hasMatch(imageUrl)) {
+      try {
+        final decodedImage = base64Decode(
+          imageUrl.startsWith('data:image')
+              ? imageUrl.split(',')[1]
+              : imageUrl,
+        );
+        return Image.memory(
+          decodedImage,
+          width: 100,
+          height: 100,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => Container(
+            width: 100,
+            height: 100,
+            color: Colors.grey[200],
+            child: const Center(
+              child: Icon(Icons.broken_image, color: Colors.grey),
+            ),
+          ),
+        );
+      } catch (e) {
+        debugPrint('Error decoding base64 image: $e');
+        return Container(
+          width: 100,
+          height: 100,
+          color: Colors.grey[200],
+          child: const Center(
+            child: Icon(Icons.broken_image, color: Colors.grey),
+          ),
+        );
+      }
+    } else {
+      return Image.network(
+        imageUrl,
+        width: 100,
+        height: 100,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: 100,
+            height: 100,
+            color: Colors.grey[200],
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
+                color: Colors.black,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => Container(
+          width: 100,
+          height: 100,
+          color: Colors.grey[200],
+          child: const Center(
+            child: Icon(Icons.broken_image, color: Colors.grey),
+          ),
+        ),
+      );
+    }
   }
 }
 
@@ -1089,7 +1570,7 @@ class _RequestsPageState extends State<RequestsPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => RequestsPage(
+          builder: (context) => HistoryPage(
             loggedInUserMID: widget.loggedInUserMID,
             loggedInGID: widget.loggedInGID,
           ),
@@ -1104,6 +1585,13 @@ class _RequestsPageState extends State<RequestsPage> {
       backgroundColor: AppTheme.surfaceColor,
       appBar: CustomAppBar(
         title: 'Meeting Requests',
+        onBackPressed: () {
+          // Navigate back to Team Members page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const OneToOnePage()),
+          );
+        },
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 8),
@@ -1615,7 +2103,7 @@ class _ArrangeMeetingPageState extends State<ArrangeMeetingPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => RequestsPage(
+          builder: (context) => HistoryPage(
             loggedInUserMID: widget.fromMID,
             loggedInGID: widget.gId,
           ),
@@ -1630,6 +2118,13 @@ class _ArrangeMeetingPageState extends State<ArrangeMeetingPage> {
       backgroundColor: AppTheme.surfaceColor,
       appBar: CustomAppBar(
         title: 'Arrange Meeting',
+        onBackPressed: () {
+          // Navigate back to Team Members page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const OneToOnePage()),
+          );
+        },
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -1859,7 +2354,7 @@ class _ArrangeMeetingPageState extends State<ArrangeMeetingPage> {
   }
 }
 
-// ScheduleMeetingsPage with Fixed Completion and Image Upload
+// ScheduleMeetingsPage with Fixed Navigation
 class ScheduleMeetingsPage extends StatefulWidget {
   final String? loggedInUserMID;
   final String? loggedInGID;
@@ -2255,21 +2750,13 @@ class _ScheduleMeetingsPageState extends State<ScheduleMeetingsPage> {
     setState(() {
       _selectedIndex = index;
     });
-    if (index == 0 && widget.loggedInUserMID != null && widget.loggedInGID != null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ScheduleMeetingsPage(
-            loggedInUserMID: widget.loggedInUserMID,
-            loggedInGID: widget.loggedInGID,
-          ),
-        ),
-      );
+    if (index == 0) {
+      // Already on meetings page
     } else if (index == 1 && widget.loggedInUserMID != null && widget.loggedInGID != null) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => RequestsPage(
+          builder: (context) => HistoryPage(
             loggedInUserMID: widget.loggedInUserMID,
             loggedInGID: widget.loggedInGID,
           ),
@@ -2284,6 +2771,13 @@ class _ScheduleMeetingsPageState extends State<ScheduleMeetingsPage> {
       backgroundColor: AppTheme.surfaceColor,
       appBar: CustomAppBar(
         title: 'Scheduled Meetings',
+        onBackPressed: () {
+          // Navigate back to Team Members page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const OneToOnePage()),
+          );
+        },
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 8),
@@ -2650,24 +3144,5 @@ class _ScheduleMeetingsPageState extends State<ScheduleMeetingsPage> {
         ),
       );
     }
-  }
-}
-
-// Main App
-void main() {
-  runApp(const MeetingApp());
-}
-
-class MeetingApp extends StatelessWidget {
-  const MeetingApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Meeting Manager',
-      theme: AppTheme.theme,
-      home: const OneToOnePage(),
-      debugShowCheckedModeBanner: false,
-    );
   }
 }
