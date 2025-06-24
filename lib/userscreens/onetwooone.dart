@@ -641,21 +641,7 @@ class _OneToOnePageState extends State<OneToOnePage> {
                     : Column(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Icon(Icons.people, color: Colors.black, size: 24),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${filteredMembers.length} Active Members',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            padding: const EdgeInsets.all(16),                           
                           ),
                           Expanded(
                             child: GridView.builder(
