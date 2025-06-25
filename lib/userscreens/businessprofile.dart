@@ -1,11 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class BusinessPage extends StatefulWidget {
   const BusinessPage({super.key});
@@ -30,13 +26,18 @@ class _BusinessPageState extends State<BusinessPage> {
   final _tellinkController = TextEditingController();
   final _lilinkController = TextEditingController();
 
-  File? _selectedLogo;
-  final ImagePicker _picker = ImagePicker();
-
   @override
   void initState() {
     super.initState();
+    _debugSharedPreferences();
     _fetchBusinessProfile();
+  }
+
+  Future<void> _debugSharedPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    debugPrint('SharedPreferences - mem_busi_id: ${prefs.getString('mem_busi_id')}');
+    debugPrint('SharedPreferences - G_ID: ${prefs.getInt('G_ID')}');
+    debugPrint('SharedPreferences - M_ID: ${prefs.getInt('M_ID')}');
   }
 
   @override
@@ -65,7 +66,15 @@ class _BusinessPageState extends State<BusinessPage> {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final responseBody = response.body;
+        debugPrint('GET API Response: $responseBody');
+        final data = json.decode(responseBody);
+        if (data['mem_busi_id'] != null) {
+          await prefs.setString('mem_busi_id', data['mem_busi_id'].toString());
+          debugPrint('Stored mem_busi_id from API: ${data['mem_busi_id']}');
+        } else {
+          debugPrint('Warning: mem_busi_id not found in API response');
+        }
         setState(() {
           _businessData = data;
           _populateControllers();
@@ -95,84 +104,20 @@ class _BusinessPageState extends State<BusinessPage> {
     _lilinkController.text = _businessData['lilink'] ?? '';
   }
 
-  Future<void> _pickLogo() async {
-    try {
-      // Determine the correct permission based on platform and Android version
-      Permission permission;
-      if (Platform.isAndroid) {
-        final androidSdkVersion = await _getAndroidSdkVersion();
-        permission = androidSdkVersion >= 33 ? Permission.photos : Permission.storage;
-        debugPrint('Selected permission for SDK $androidSdkVersion: $permission');
-      } else {
-        permission = Permission.photos;
-      }
-
-      // Check permission status
-      var status = await permission.status;
-      debugPrint('Initial Permission: $permission, Status: $status');
-
-      if (status.isPermanentlyDenied) {
-        _showErrorSnackBar(
-            'Storage or Photos permission is permanently denied. Please enable it in app settings.');
-        await openAppSettings();
-        return;
-      }
-
-      if (!status.isGranted) {
-        status = await permission.request();
-        debugPrint('Requested Permission: $permission, Status: $status');
-      }
-
-      if (status.isGranted) {
-        final XFile? image = await _picker.pickImage(
-          source: ImageSource.gallery,
-          maxWidth: 512,
-          maxHeight: 512,
-          imageQuality: 80,
-        );
-
-        if (image != null) {
-          final file = File(image.path);
-          if (await file.exists()) {
-            setState(() {
-              _selectedLogo = file;
-            });
-            debugPrint('Image selected: ${image.path}');
-          } else {
-            _showErrorSnackBar('Selected image file does not exist');
-            debugPrint('File does not exist: ${image.path}');
-          }
-        } else {
-          _showErrorSnackBar('No image selected');
-          debugPrint('No image selected');
-        }
-      } else {
-        _showErrorSnackBar(
-            'Permission denied for ${permission == Permission.photos ? 'Photos' : 'Storage'}. Please grant permission in app settings.');
-        debugPrint('Permission denied: $permission');
-      }
-    } catch (e) {
-      _showErrorSnackBar('Error picking image: $e');
-      debugPrint('Image picker error: $e');
-    }
-  }
-
-  Future<int> _getAndroidSdkVersion() async {
-    if (Platform.isAndroid) {
-      final deviceInfo = DeviceInfoPlugin();
-      final androidInfo = await deviceInfo.androidInfo;
-      debugPrint('Android SDK Version: ${androidInfo.version.sdkInt}');
-      return androidInfo.version.sdkInt;
-    }
-    return 0;
-  }
-
   Future<void> _updateBusinessProfile() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final gId = prefs.getInt('G_ID') ?? 2;
       final mId = prefs.getInt('M_ID') ?? 1;
-      final memBusiId = prefs.getString('mem_busi_id') ?? '2';
+      final memBusiId = prefs.getString('mem_busi_id');
+
+      if (memBusiId == null) {
+        _showErrorSnackBar('Member business ID is missing. Please set it first.');
+        debugPrint('Error: mem_busi_id is null');
+        return;
+      }
+
+      debugPrint('Sending mem_busi_id: $memBusiId');
 
       var request = http.MultipartRequest(
         'POST',
@@ -195,31 +140,20 @@ class _BusinessPageState extends State<BusinessPage> {
         'M_ID': mId.toString(),
       });
 
-      // Add logo file if selected
-      if (_selectedLogo != null && await _selectedLogo!.exists()) {
-        request.files.add(
-          await http.MultipartFile.fromPath('logo', _selectedLogo!.path),
-        );
-        debugPrint('Logo file added: ${_selectedLogo!.path}');
-      } else if (_selectedLogo != null) {
-        _showErrorSnackBar('Selected logo file does not exist');
-        debugPrint('Logo file does not exist: ${_selectedLogo!.path}');
-        return;
-      }
-
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
+      debugPrint('POST API Response: $responseBody');
 
       if (response.statusCode == 200) {
         setState(() {
           _isEditing = false;
-          _selectedLogo = null;
         });
         _showSuccessSnackBar('Business profile updated successfully!');
         await _fetchBusinessProfile();
-        debugPrint('Update response: $responseBody');
       } else {
-        throw Exception('Failed to update business profile: ${response.statusCode} - $responseBody');
+        final errorData = json.decode(responseBody);
+        final errorMessage = errorData['error'] ?? 'Unknown error';
+        throw Exception('Failed to update business profile: ${response.statusCode} - $errorMessage');
       }
     } catch (e) {
       _showErrorSnackBar('Error updating business profile: $e');
@@ -269,22 +203,30 @@ class _BusinessPageState extends State<BusinessPage> {
           ),
         ),
         actions: [
-          if (!_isLoading)
-            IconButton(
-              icon: Icon(
-                _isEditing ? Icons.save : Icons.edit,
-                color: Colors.white,
-              ),
-              onPressed: () {
-                if (_isEditing) {
-                  _updateBusinessProfile();
-                } else {
-                  setState(() {
-                    _isEditing = true;
-                  });
-                }
-              },
-            ),
+          FutureBuilder<String?>(
+            future: SharedPreferences.getInstance()
+                .then((prefs) => prefs.getString('mem_busi_id')),
+            builder: (context, snapshot) {
+              if (!_isLoading && snapshot.hasData && snapshot.data != null) {
+                return IconButton(
+                  icon: Icon(
+                    _isEditing ? Icons.save : Icons.edit,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    if (_isEditing) {
+                      _updateBusinessProfile();
+                    } else {
+                      setState(() {
+                        _isEditing = true;
+                      });
+                    }
+                  },
+                );
+              }
+              return const SizedBox.shrink(); // Hide button if mem_busi_id is null
+            },
+          ),
           if (_isEditing)
             IconButton(
               icon: const Icon(Icons.cancel, color: Colors.white),
@@ -292,7 +234,6 @@ class _BusinessPageState extends State<BusinessPage> {
                 setState(() {
                   _isEditing = false;
                   _populateControllers();
-                  _selectedLogo = null;
                 });
               },
             ),
@@ -338,27 +279,6 @@ class _BusinessPageState extends State<BusinessPage> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (_businessData['logo'] != null) ...[
-                            const SizedBox(height: 16),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                _businessData['logo'],
-                                height: 60,
-                                width: 60,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  debugPrint('Image load error: $error');
-                                  return Container(
-                                    height: 60,
-                                    width: 60,
-                                    color: Colors.grey[300],
-                                    child: const Icon(Icons.business),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -373,32 +293,6 @@ class _BusinessPageState extends State<BusinessPage> {
                             labelText: 'Business Name',
                             border: OutlineInputBorder(),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildEditCard(
-                        title: 'Logo',
-                        icon: Icons.image,
-                        child: Column(
-                          children: [
-                            if (_selectedLogo != null)
-                              Image.file(
-                                _selectedLogo!,
-                                height: 100,
-                                width: 100,
-                                fit: BoxFit.cover,
-                              ),
-                            const SizedBox(height: 8),
-                            ElevatedButton.icon(
-                              onPressed: _pickLogo,
-                              icon: const Icon(Icons.upload),
-                              label: const Text('Select Logo'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.black,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -455,7 +349,9 @@ class _BusinessPageState extends State<BusinessPage> {
                     const SizedBox(height: 16),
                     _buildInfoCard(
                       title: 'Contact Information',
-                      icon: Icons.contact_mail,
+                      icon: Icons
+
+.contact_mail,
                       children: [
                         if (_isEditing) ...[
                           TextFormField(

@@ -63,7 +63,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _navigateToGetStarted() {
-    Timer(const Duration(seconds: 4), () {
+    Timer(const Duration(seconds: 2), () {
       Navigator.of(context).pushReplacementNamed('/get-started');
     });
   }

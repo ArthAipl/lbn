@@ -74,9 +74,9 @@ Widget buildEditableInfoCard({
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: enabled 
-                ? [Colors.black, const Color(0xFF2C2C2C)]
-                : [Colors.grey.shade400, Colors.grey.shade500],
+              colors: enabled
+                  ? [Colors.black, const Color(0xFF2C2C2C)]
+                  : [Colors.grey.shade400, Colors.grey.shade500],
             ),
             borderRadius: BorderRadius.circular(8),
           ),
@@ -113,6 +113,7 @@ Widget buildEditableInfoCard({
                     color: Colors.grey.shade400,
                     fontSize: 15,
                   ),
+                  hintText: 'Enter $title',
                 ),
                 validator: validator,
               ),
@@ -154,7 +155,7 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
     _groupCodeController = TextEditingController();
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -162,10 +163,10 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    
+
     _loadUserData();
     _animationController.forward();
-    
+
     // Listen for changes
     _nameController.addListener(_onFieldChanged);
     _emailController.addListener(_onFieldChanged);
@@ -193,26 +194,48 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
       final prefs = await SharedPreferences.getInstance();
       final keys = prefs.getKeys();
       print('SharedPreferences keys: $keys');
-      print('SharedPreferences values: ${keys.map((key) => '$key: ${prefs.get(key)}').join(', ')}');
-      
+      print(
+          'SharedPreferences values: ${keys.map((key) => '$key: ${prefs.get(key)}').join(', ')}');
+
+      // Handle user_id which might be stored as int or string
+      var userIdRaw = prefs.get('user_id');
+      if (userIdRaw != null) {
+        _userId = userIdRaw.toString();
+      }
+
+      // Handle role_id which might be stored as int or string
+      var roleIdRaw = prefs.get('user_role') ?? prefs.get('role_id');
+      if (roleIdRaw != null) {
+        _roleId = roleIdRaw.toString();
+      } else {
+        _roleId = '3'; // Default to role 3 if not found
+      }
+
+      // Load user_name, default to empty string if null
+      String name = prefs.getString('user_name') ?? '';
+      print('Loaded user_name from SharedPreferences: "$name"');
+
       setState(() {
-        _userId = prefs.getString('user_id') ?? '';
         _authToken = prefs.getString('auth_token') ?? prefs.getString('token') ?? '';
-        _roleId = prefs.getString('role_id') ?? prefs.getString('user_role') ?? '3'; // Default to role 3
-        _nameController.text = prefs.getString('user_name') ?? '';
+        _nameController.text = name;
         _emailController.text = prefs.getString('user_email') ?? '';
         _phoneController.text = prefs.getString('user_phone') ?? '';
         _groupCodeController.text = prefs.getString('group_code') ?? '';
-        _errorMessage = _userId.isEmpty ? 'No profile data found. Please log in.' : null;
+        _errorMessage = _userId.isEmpty
+            ? 'No profile data found. Please log in.'
+            : name.isEmpty
+                ? 'Please enter your name below and save.'
+                : null;
         _hasChanges = false;
       });
-      
+
       if (_userId.isEmpty) {
         print('Error: user_id is missing in SharedPreferences');
       } else {
         print('user_id loaded: $_userId');
         print('role_id loaded: $_roleId');
         print('auth_token loaded: ${_authToken.isNotEmpty ? "Yes" : "No"}');
+        print('name loaded: $name');
         print('Profile data loaded successfully');
       }
     } catch (e) {
@@ -240,6 +263,16 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
     });
 
     try {
+      // Save to SharedPreferences first
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_id', _userId);
+      String name = _nameController.text.trim();
+      await prefs.setString('user_name', name);
+      await prefs.setString('user_email', _emailController.text.trim());
+      await prefs.setString('user_phone', _phoneController.text.trim());
+      await prefs.setString('group_code', _groupCodeController.text.trim());
+      print('Saved user_name to SharedPreferences: "$name"');
+
       // Prepare headers with authentication if available
       Map<String, String> headers = {
         'Content-Type': 'application/json; charset=UTF-8',
@@ -253,14 +286,13 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
       print('Request headers: $headers');
       print('User ID: $_userId, Role ID: $_roleId');
 
-      // Try different API approaches - focusing on UPDATE operations, not registration
+      // Try different API approaches - focusing on UPDATE operations
       List<Map<String, dynamic>> apiAttempts = [
-        // Try user-specific endpoints (not member endpoints)
         {
           'method': 'PUT',
           'url': 'https://tagai.caxis.ca/public/api/users/$_userId',
           'body': {
-            'name': _nameController.text.trim(),
+            'name': name,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'group_code': _groupCodeController.text.trim(),
@@ -270,7 +302,7 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
           'method': 'PATCH',
           'url': 'https://tagai.caxis.ca/public/api/users/$_userId',
           'body': {
-            'name': _nameController.text.trim(),
+            'name': name,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'group_code': _groupCodeController.text.trim(),
@@ -281,19 +313,18 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
           'url': 'https://tagai.caxis.ca/public/api/users/update',
           'body': {
             'user_id': _userId,
-            'name': _nameController.text.trim(),
+            'name': name,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'group_code': _groupCodeController.text.trim(),
           },
         },
-        // Try profile endpoints
         {
           'method': 'PUT',
           'url': 'https://tagai.caxis.ca/public/api/profile',
           'body': {
             'user_id': _userId,
-            'name': _nameController.text.trim(),
+            'name': name,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'group_code': _groupCodeController.text.trim(),
@@ -304,20 +335,19 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
           'url': 'https://tagai.caxis.ca/public/api/profile/update',
           'body': {
             'user_id': _userId,
-            'name': _nameController.text.trim(),
+            'name': name,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'group_code': _groupCodeController.text.trim(),
           },
         },
-        // Try member endpoints with proper role_id
         {
           'method': 'PUT',
           'url': 'https://tagai.caxis.ca/public/api/member/$_userId',
           'body': {
             'user_id': _userId,
-            'role_id': 3, // Required role for member operations
-            'name': _nameController.text.trim(),
+            'role_id': 3,
+            'name': name,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'group_code': _groupCodeController.text.trim(),
@@ -330,14 +360,13 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
           'body': {
             'user_id': _userId,
             'role_id': 3,
-            'name': _nameController.text.trim(),
+            'name': name,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'group_code': _groupCodeController.text.trim(),
             'is_update': true,
           },
         },
-        // Try with different member endpoint structures
         {
           'method': 'POST',
           'url': 'https://tagai.caxis.ca/public/api/update-member',
@@ -345,25 +374,24 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
             'id': _userId,
             'user_id': _userId,
             'role_id': 3,
-            'name': _nameController.text.trim(),
+            'name': name,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'group_code': _groupCodeController.text.trim(),
           },
         },
-        // Try with form-data style
         {
           'method': 'POST',
           'url': 'https://tagai.caxis.ca/public/api/member',
           'body': {
             'user_id': _userId,
             'role_id': 3,
-            'name': _nameController.text.trim(),
+            'name': name,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'group_code': _groupCodeController.text.trim(),
-            'method': 'PUT', // Override method
-            '_method': 'PUT', // Laravel method override
+            'method': 'PUT',
+            '_method': 'PUT',
             'update': 1,
           },
         },
@@ -379,7 +407,7 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
           print('Body: ${jsonEncode(attempt['body'])}');
 
           http.Response response;
-          
+
           switch (attempt['method']) {
             case 'PUT':
               response = await http.put(
@@ -395,7 +423,7 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                 body: jsonEncode(attempt['body']),
               );
               break;
-            default: // POST
+            default:
               response = await http.post(
                 Uri.parse(attempt['url']),
                 headers: headers,
@@ -407,18 +435,16 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
           print('Response Body: ${response.body}');
 
           if (response.statusCode == 200 || response.statusCode == 201) {
-            // Check if response indicates success
             try {
               final responseData = jsonDecode(response.body);
               if (responseData is Map) {
-                // Check for success indicators
-                bool isSuccess = responseData['success'] == true || 
-                               responseData['status'] == true ||
-                               responseData['status'] == 'success' ||
-                               responseData.containsKey('data') ||
-                               responseData.containsKey('user') ||
-                               responseData.containsKey('member');
-                
+                bool isSuccess = responseData['success'] == true ||
+                    responseData['status'] == true ||
+                    responseData['status'] == 'success' ||
+                    responseData.containsKey('data') ||
+                    responseData.containsKey('user') ||
+                    responseData.containsKey('member');
+
                 if (isSuccess || responseData['status'] != false) {
                   successResponse = response;
                   successEndpoint = attempt['url'];
@@ -428,7 +454,6 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                 }
               }
             } catch (e) {
-              // If response is not JSON, consider 200/201 as success
               successResponse = response;
               successEndpoint = attempt['url'];
               successMethod = attempt['method'];
@@ -439,9 +464,7 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
             print('❌ Endpoint not found: ${attempt['url']}');
           } else if (response.statusCode == 403) {
             print('❌ Access forbidden (403): ${response.body}');
-            // Continue trying other endpoints
           } else if (response.statusCode == 422) {
-            // Validation error - show specific message
             try {
               final errorData = jsonDecode(response.body);
               print('❌ Validation Error: ${errorData}');
@@ -451,7 +474,6 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
           } else {
             print('❌ Failed with status ${response.statusCode}: ${response.body}');
           }
-          
         } catch (e) {
           print('❌ Network error for ${attempt['method']} ${attempt['url']}: $e');
           continue;
@@ -459,14 +481,6 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
       }
 
       if (successResponse != null) {
-        // Success! Update local storage
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_id', _userId);
-        await prefs.setString('user_name', _nameController.text.trim());
-        await prefs.setString('user_email', _emailController.text.trim());
-        await prefs.setString('user_phone', _phoneController.text.trim());
-        await prefs.setString('group_code', _groupCodeController.text.trim());
-
         setState(() {
           _hasChanges = false;
         });
@@ -483,19 +497,9 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
 
         print('🎉 Profile updated successfully using: $successMethod $successEndpoint');
       } else {
-        // All attempts failed - but save locally
         setState(() {
-          _errorMessage = 'Unable to update profile on server.\n\nThis might be because:\n• The API requires special permissions\n• Your account role doesn\'t allow updates\n• The server endpoints have changed\n\nYour changes are saved locally.';
-        });
-
-        // Still save locally as backup
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_name', _nameController.text.trim());
-        await prefs.setString('user_email', _emailController.text.trim());
-        await prefs.setString('user_phone', _phoneController.text.trim());
-        
-        setState(() {
-          _hasChanges = false;
+          _errorMessage =
+              'Unable to update profile on server.\n\nThis might be because:\n• The API requires special permissions\n• Your account role doesn\'t allow updates\n• The server endpoints have changed\n\nYour changes are saved locally.';
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -518,16 +522,6 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
       print('💥 Critical error in _saveUserData: $e');
       setState(() {
         _errorMessage = 'Network error: $e';
-      });
-
-      // Save locally as fallback
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_name', _nameController.text.trim());
-      await prefs.setString('user_email', _emailController.text.trim());
-      await prefs.setString('user_phone', _phoneController.text.trim());
-      
-      setState(() {
-        _hasChanges = false;
       });
     } finally {
       setState(() {
@@ -630,7 +624,6 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      // Profile Header
                       Container(
                         width: double.infinity,
                         decoration: const BoxDecoration(
@@ -647,7 +640,10 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                               padding: const EdgeInsets.all(3),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Colors.white.withOpacity(0.3), Colors.white.withOpacity(0.1)],
+                                  colors: [
+                                    Colors.white.withOpacity(0.3),
+                                    Colors.white.withOpacity(0.1)
+                                  ],
                                 ),
                                 borderRadius: BorderRadius.circular(50),
                               ),
@@ -694,8 +690,6 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                           ],
                         ),
                       ),
-                      
-                      // Editable Profile Details
                       Padding(
                         padding: const EdgeInsets.all(20),
                         child: Column(
@@ -714,7 +708,8 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(Icons.info_outline, color: Colors.orange.shade600, size: 20),
+                                    Icon(Icons.info_outline,
+                                        color: Colors.orange.shade600, size: 20),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -729,45 +724,16 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                                   ],
                                 ),
                               ),
-                            
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [Colors.black, Color(0xFF2C2C2C)],
-                                    ),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Icon(
-                                    Icons.edit,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                const Text(
-                                  'Edit Your Information',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black87,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Tap on any field to edit directly',
+                            const Text(
+                              'Edit Your Information',
                               style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade600,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                                letterSpacing: 0.3,
                               ),
                             ),
                             const SizedBox(height: 20),
-                            
                             buildEditableInfoCard(
                               title: 'Full Name',
                               controller: _nameController,
@@ -775,7 +741,6 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                               validator: (value) =>
                                   value!.trim().isEmpty ? 'Please enter your name' : null,
                             ),
-                            
                             buildEditableInfoCard(
                               title: 'Email Address',
                               controller: _emailController,
@@ -789,7 +754,6 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                                 return null;
                               },
                             ),
-                            
                             buildEditableInfoCard(
                               title: 'Phone Number',
                               controller: _phoneController,
@@ -797,20 +761,7 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                               validator: (value) =>
                                   value!.trim().isEmpty ? 'Please enter your phone number' : null,
                             ),
-                            
-                            buildEditableInfoCard(
-                              title: 'Group Code (Read Only)',
-                              controller: _groupCodeController,
-                              icon: Icons.group_outlined,
-                              readOnly: true,
-                              enabled: false,
-                              validator: (value) =>
-                                  value!.trim().isEmpty ? 'Group code cannot be empty' : null,
-                            ),
-                            
                             const SizedBox(height: 24),
-                            
-                            // Save Button - only show when there are changes
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 300),
                               height: _hasChanges ? 50 : 0,
@@ -822,11 +773,11 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                                           colors: [Colors.black, Color(0xFF2C2C2C)],
                                         ),
                                         borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [
+                                        boxShadow: const [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.3),
+                                            color: Colors.black87,
                                             blurRadius: 15,
-                                            offset: const Offset(0, 8),
+                                            offset: Offset(0, 8),
                                           ),
                                         ],
                                       ),
@@ -844,7 +795,8 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
                                                 height: 20,
                                                 width: 20,
                                                 child: CircularProgressIndicator(
-                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<Color>(Colors.white),
                                                   strokeWidth: 2,
                                                 ),
                                               )

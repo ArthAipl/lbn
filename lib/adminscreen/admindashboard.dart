@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lbn/adminscreen/adminonetoone.dart';
 import 'package:lbn/adminscreen/eventsadmin.dart';
 import 'package:lbn/adminscreen/grupmembers.dart';
 import 'package:lbn/adminscreen/meetingsadmin.dart';
@@ -7,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lbn/adminscreen/adminprofilepage.dart';
 import 'package:lbn/screens/loginscreen.dart';
 import 'package:flutter/services.dart';
+
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -113,23 +115,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case 'Events':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const EventsHomePage()),
+          MaterialPageRoute(builder: (context) => const EventsAdminPage()),
         );
         break;
       case 'Meetings':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => MeetingsAdmin()), // Updated to navigate to MeetingAdmin
+          MaterialPageRoute(builder: (context) => MeetingAdminPage()),
         );
         break;
-      case 'Gallery':
-        _showFeatureComingSoon('Gallery');
-        break;
-      case 'Attendance':
-        _showFeatureComingSoon('Attendance');
-        break;
-      case 'Visitors':
-        _showFeatureComingSoon('Visitors');
+      case 'One 2 One':
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) =>  OneToOneAdmin()),
+        );
         break;
       case 'Profile':
         Navigator.push(
@@ -399,19 +398,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Text(
+            //   userName.isNotEmpty ? 'Welcome back, $userName!' : 'Welcome back!',
+            //   style: const TextStyle(
+            //     fontSize: 24,
+            //     fontWeight: FontWeight.bold,
+            //     color: Color(0xFF1E2C),
+            //   ),
+            // ),
+           
             Text(
-              userName.isNotEmpty ? 'Welcome back, $userName!' : 'Welcome back!',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E1E2C),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Here\'s what\'s happening in your network',
+              'Here\'s what\'s happening in your network!',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 16,
                 color: Colors.grey[600],
               ),
             ),
@@ -522,9 +521,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       {'title': 'Members', 'icon': Icons.people_alt_rounded, 'color': const Color(0xFF6C63FF)},
       {'title': 'Events', 'icon': Icons.event_rounded, 'color': Colors.green},
       {'title': 'Meetings', 'icon': Icons.meeting_room_rounded, 'color': Colors.orange},
-      {'title': 'Gallery', 'icon': Icons.photo_library_rounded, 'color': Colors.purple},
-      {'title': 'Attendance', 'icon': Icons.check_circle_rounded, 'color': Colors.teal},
-      {'title': 'Visitors', 'icon': Icons.person_add_alt_1_rounded, 'color': Colors.red},
+      {'title': 'One 2 One', 'icon': Icons.person_pin_rounded, 'color': Colors.purple},
     ];
 
     return Column(
@@ -600,6 +597,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 color: Color(0xFF1E1E2C),
+                decoration: TextDecoration.none,
               ),
             ),
           ],

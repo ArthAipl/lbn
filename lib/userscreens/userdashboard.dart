@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:lbn/adminscreen/meetingsadmin.dart';
 import 'package:lbn/screens/loginscreen.dart';
 import 'package:lbn/userscreens/businessprofile.dart';
+import 'package:lbn/userscreens/circlemeetinguser.dart';
 import 'package:lbn/userscreens/eventsmembers.dart';
 import 'package:lbn/userscreens/meetingsuser.dart';
 import 'package:lbn/userscreens/memberprofile.dart';
 import 'package:lbn/userscreens/onetwooone.dart';
+import 'package:lbn/userscreens/refrenceuser.dart';
 import 'package:lbn/userscreens/usermembers.dart';
+import 'package:lbn/userscreens/visitorsusers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserDashboard extends StatefulWidget {
@@ -48,16 +52,6 @@ class _UserDashboardState extends State<UserDashboard> {
           fontWeight: FontWeight.bold,
         ),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          onPressed: () {},
-        ),
-        IconButton(
-          icon: const Icon(Icons.search, color: Colors.white),
-          onPressed: () {},
-        ),
-      ],
     );
   }
 
@@ -194,7 +188,6 @@ class _UserDashboardState extends State<UserDashboard> {
         ),
         onTap: () async {
           if (isLogout) {
-            // Show confirmation dialog
             bool? confirm = await showDialog(
               context: context,
               builder: (context) => AlertDialog(
@@ -215,13 +208,10 @@ class _UserDashboardState extends State<UserDashboard> {
 
             if (confirm == true) {
               try {
-                // Clear specific SharedPreferences keys
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.remove('auth_token');
                 await prefs.remove('user_id');
-                // Add other specific keys to clear as needed
 
-                // Navigate to LoginScreen and remove all previous routes
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -234,7 +224,7 @@ class _UserDashboardState extends State<UserDashboard> {
               }
             }
           } else if (isNavigationItem) {
-            Navigator.pop(context); // Close the drawer
+            Navigator.pop(context);
             if (title == 'Members') {
               Navigator.push(
                 context,
@@ -373,9 +363,42 @@ class _UserDashboardState extends State<UserDashboard> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) =>  OneToOnePage()),
+                      MaterialPageRoute(builder: (context) => const OneToOnePage()),
                     );
                   },
+                ),
+                _buildFeatureCard(
+                  'Circle Meeting',
+                  Icons.group,
+                  Colors.teal,
+                   onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) =>  CircleMeetingPage()),
+          );
+        },
+                ),
+                _buildFeatureCard(
+                  'Visitors',
+                  Icons.person_pin,
+                  Colors.indigo,
+                  onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const VisitorManagementScreen()),
+          );
+        },
+                ),
+                _buildFeatureCard(
+                  'Reference',
+                  Icons.bookmark,
+                  Colors.amber,
+                    onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) =>  ReferencePage()),
+          );
+        },
                 ),
               ],
             ),

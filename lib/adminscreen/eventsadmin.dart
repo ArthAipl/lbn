@@ -1,370 +1,131 @@
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
-// ==================== MODEL CLASSES ====================
-
-class Event {
-  final int? evCalId;
-  final String eventName;
-  final String eventDate;
-  final String eventMode;
-  final String place;
-  final String feesCatId;
-  final String gId;
-  final String mId;
-  final String? createdAt;
-  final String? updatedAt;
-  final FeesCategory? feesCategory;
-  final GroupMaster? groupMaster;
-  final Member? member;
-
-  Event({
-    this.evCalId,
-    required this.eventName,
-    required this.eventDate,
-    required this.eventMode,
-    required this.place,
-    required this.feesCatId,
-    required this.gId,
-    required this.mId,
-    this.createdAt,
-    this.updatedAt,
-    this.feesCategory,
-    this.groupMaster,
-    this.member,
-  });
-
-  factory Event.fromJson(Map<String, dynamic> json) {
-    return Event(
-      evCalId: json['Ev_Cal_Id'],
-      eventName: json['Event_Name'],
-      eventDate: json['Event_Date'],
-      eventMode: json['Event_Mode'],
-      place: json['Place'],
-      feesCatId: json['fees_cat_id'].toString(),
-      gId: json['G_ID'].toString(),
-      mId: json['M_ID'].toString(),
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
-      feesCategory: json['fees_category'] != null
-          ? FeesCategory.fromJson(json['fees_category'])
-          : null,
-      groupMaster: json['group_master'] != null
-          ? GroupMaster.fromJson(json['group_master'])
-          : null,
-      member: json['member'] != null ? Member.fromJson(json['member']) : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'Event_Name': eventName,
-      'Event_Date': eventDate,
-      'Event_Mode': eventMode,
-      'Place': place,
-      'fees_cat_id': feesCatId,
-      'G_ID': gId,
-      'M_ID': mId,
-    };
-  }
+void main() {
+  runApp(const MyApp());
 }
 
-class FeesCategory {
-  final int feesCatId;
-  final String? gId;
-  final String? mId;
-  final String desc;
-  final String amount;
-  final String lateCharge;
-  final String? createdAt;
-  final String? updatedAt;
-
-  FeesCategory({
-    required this.feesCatId,
-    this.gId,
-    this.mId,
-    required this.desc,
-    required this.amount,
-    required this.lateCharge,
-    this.createdAt,
-    this.updatedAt,
-  });
-
-  factory FeesCategory.fromJson(Map<String, dynamic> json) {
-    return FeesCategory(
-      feesCatId: json['fees_cat_id'],
-      gId: json['G_ID']?.toString(),
-      mId: json['M_ID']?.toString(),
-      desc: json['Desc'],
-      amount: json['Amount'],
-      lateCharge: json['LateCharge'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
-    );
-  }
-}
-
-class GroupMaster {
-  final int gId;
-  final String name;
-  final String shortGroupName;
-  final String groupName;
-  final String email;
-  final String number;
-  final String gropCode;
-  final String panNum;
-  final String roleId;
-  final String status;
-  final String? createdAt;
-  final String? updatedAt;
-
-  GroupMaster({
-    required this.gId,
-    required this.name,
-    required this.shortGroupName,
-    required this.groupName,
-    required this.email,
-    required this.number,
-    required this.gropCode,
-    required this.panNum,
-    required this.roleId,
-    required this.status,
-    this.createdAt,
-    this.updatedAt,
-  });
-
-  factory GroupMaster.fromJson(Map<String, dynamic> json) {
-    return GroupMaster(
-      gId: json['G_ID'],
-      name: json['name'],
-      shortGroupName: json['short_group_name'],
-      groupName: json['group_name'],
-      email: json['email'],
-      number: json['number'],
-      gropCode: json['Grop_code'],
-      panNum: json['pan_num'],
-      roleId: json['role_id'],
-      status: json['status'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
-    );
-  }
-}
-
-class Member {
-  final String mId;
-  final String name;
-  final String email;
-  final String number;
-  final String gropCode;
-  final String password;
-  final String roleId;
-  final String status;
-  final String? createdAt;
-  final String? updatedAt;
-
-  Member({
-    required this.mId,
-    required this.name,
-    required this.email,
-    required this.number,
-    required this.gropCode,
-    required this.password,
-    required this.roleId,
-    required this.status,
-    this.createdAt,
-    this.updatedAt,
-  });
-
-  factory Member.fromJson(Map<String, dynamic> json) {
-    return Member(
-      mId: json['M_ID'].toString(),
-      name: json['Name'],
-      email: json['email'],
-      number: json['number'],
-      gropCode: json['Grop_code'],
-      password: json['password'],
-      roleId: json['role_id'],
-      status: json['status'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
-    );
-  }
-}
-
-// ==================== SERVICE CLASSES ====================
-
-class ApiService {
-  static const String baseUrl = 'https://tagai.caxis.ca/public/api';
-  static const String eventsEndpoint = '$baseUrl/event-cals';
-  static const String feesCategoriesEndpoint = '$baseUrl/fees-categories';
-
-  // Get all events
-  static Future<List<Event>> getEvents() async {
-    try {
-      final response = await http.get(
-        Uri.parse(eventsEndpoint),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> jsonData = json.decode(response.body);
-        return jsonData.map((json) => Event.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to load events: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching events: $e');
-    }
-  }
-
-  // Get events filtered by group code
-  static Future<List<Event>> getEventsByGroupCode() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final groupCode = prefs.getString('Grop_code') ?? '';
-      
-      final allEvents = await getEvents();
-      
-      // Filter events by group code if available
-      if (groupCode.isNotEmpty) {
-        return allEvents.where((event) => 
-          event.groupMaster?.gropCode == groupCode ||
-          event.member?.gropCode == groupCode
-        ).toList();
-      }
-      
-      return allEvents;
-    } catch (e) {
-      throw Exception('Error fetching events by group code: $e');
-    }
-  }
-
-  // Get fees categories
-  static Future<List<FeesCategory>> getFeesCategories() async {
-    try {
-      final response = await http.get(
-        Uri.parse(feesCategoriesEndpoint),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> jsonData = json.decode(response.body);
-        return jsonData.map((json) => FeesCategory.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to load fees categories: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching fees categories: $e');
-    }
-  }
-
-  // Create new event
-  static Future<bool> createEvent(Event event) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final gId = prefs.getString('G_ID') ?? '33'; // Keep default for G_ID as in original
-      final mId = prefs.getString('M_ID'); // No default, allow null
-
-      final eventData = event.toJson();
-      eventData['G_ID'] = gId;
-      eventData['M_ID'] = mId; // Will be null if not set in SharedPreferences
-
-      print('Sending payload: ${jsonEncode(eventData)}'); // Debug log
-
-      final response = await http.post(
-        Uri.parse(eventsEndpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(eventData),
-      );
-
-      print('API Response [${response.statusCode}]: ${response.body}'); // Debug log
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
-      } else {
-        print('Failed to create event: ${response.statusCode}');
-        print('Response body: ${response.body}');
-        return false;
-      }
-    } catch (e) {
-      print('Error creating event: $e');
-      return false;
-    }
-  }
-}
-
-class SharedPreferencesService {
-  static Future<void> saveUserData({
-    required String gId,
-    required String? mId,
-    required String gropCode,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('G_ID', gId);
-    if (mId != null) {
-      await prefs.setString('M_ID', mId);
-    } else {
-      await prefs.remove('M_ID');
-    }
-    await prefs.setString('Grop_code', gropCode);
-  }
-
-  static Future<Map<String, String?>> getUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    return {
-      'G_ID': prefs.getString('G_ID'),
-      'M_ID': prefs.getString('M_ID'),
-      'Grop_code': prefs.getString('Grop_code'),
-    };
-  }
-
-  static Future<String?> getGroupCode() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('Grop_code');
-  }
-}
-
-// ==================== WIDGET CLASSES ====================
-
-class EventsHomePage extends StatefulWidget {
-  const EventsHomePage({Key? key}) : super(key: key);
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
-  State<EventsHomePage> createState() => _EventsHomePageState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Events Admin',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey[50],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.blue, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+      ),
+      home: const EventsAdminPage(),
+    );
+  }
 }
 
-class _EventsHomePageState extends State<EventsHomePage> {
-  List<Event> events = [];
+class EventsAdminPage extends StatefulWidget {
+  const EventsAdminPage({super.key});
+
+  @override
+  State<EventsAdminPage> createState() => _EventsAdminPageState();
+}
+
+class _EventsAdminPageState extends State<EventsAdminPage> {
+  List<dynamic> events = [];
   bool isLoading = true;
-  String errorMessage = '';
+  String? gropCode;
+  String? gId;
 
   @override
   void initState() {
     super.initState();
-    loadEvents();
+    fetchEvents();
   }
 
-  Future<void> loadEvents() async {
-    try {
+  Future<void> fetchEvents() async {
+    final prefs = await SharedPreferences.getInstance();
+    gropCode = prefs.getString('Grop_code');
+    gId = prefs.getString('user_id');
+    print('Retrieved Grop_code: $gropCode');
+    print('Retrieved G_ID: $gId');
+    if (gId == null || gId!.isEmpty) {
+      print('Error: G_ID is null or empty');
       setState(() {
-        isLoading = true;
-        errorMessage = '';
+        isLoading = false;
+        events = [];
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User ID not found. Please log in again.')),
+      );
+      return;
+    }
 
-      final fetchedEvents = await ApiService.getEventsByGroupCode();
-      
-      setState(() {
-        events = fetchedEvents;
-        isLoading = false;
-      });
+    // Fallback to G_ID filtering if Grop_code is missing
+    bool useGropCode = gropCode != null && gropCode!.isNotEmpty;
+    try {
+      final response = await http.get(
+        Uri.parse('https://tagai.caxis.ca/public/api/event-cals'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('API response: $data');
+        setState(() {
+          events = data
+              .where((event) {
+                bool matchesGId = event['G_ID'].toString() == gId;
+                bool matchesGropCode = useGropCode
+                    ? event['group_master']['Grop_code']?.toString() == gropCode
+                    : true;
+                return matchesGId && matchesGropCode;
+              })
+              .toList();
+          isLoading = false;
+        });
+        print('Filtered events: $events');
+      } else {
+        print('API error: Status code ${response.statusCode}, Response: ${response.body}');
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load events')),
+        );
+      }
     } catch (e) {
+      print('Error fetching events: $e');
       setState(() {
-        errorMessage = e.toString();
         isLoading = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('An error occurred while fetching events')),
+      );
     }
   }
 
@@ -374,75 +135,75 @@ class _EventsHomePageState extends State<EventsHomePage> {
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(CupertinoIcons.back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
-          'Events Management',
+          'Events Admin',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
       ),
-      body: RefreshIndicator(
-        onRefresh: loadEvents,
-        child: isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+      body: Column(
+        children: [
+          // Create Event Button Section
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16.0),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
                 ),
-              )
-            : errorMessage.isNotEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Colors.red[300],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error loading events',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 32),
-                          child: Text(
-                            errorMessage,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: loadEvents,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  )
+              ],
+            ),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CreateEventPage(),
+                  ),
+                ).then((_) => fetchEvents());
+              },
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text(
+                'Create New Event',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+              ),
+            ),
+          ),
+          // Events List
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
                 : events.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              Icons.event_note,
+                              Icons.event_busy,
                               size: 64,
                               color: Colors.grey[400],
                             ),
@@ -451,170 +212,152 @@ class _EventsHomePageState extends State<EventsHomePage> {
                               'No events found',
                               style: TextStyle(
                                 fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Create your first event to get started',
-                              style: TextStyle(
-                                fontSize: 14,
                                 color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16.0),
                         itemCount: events.length,
                         itemBuilder: (context, index) {
                           final event = events[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 16.0),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: Padding(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(20.0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // Event Name with Icon
                                   Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
+                                        padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: event.eventMode == 'Compulsary'
-                                              ? Colors.red[100]
-                                              : Colors.blue[100],
-                                          borderRadius: BorderRadius.circular(20),
+                                          color: Colors.blue[50],
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
+                                        child: Icon(
+                                          Icons.event,
+                                          color: Colors.blue[600],
+                                          size: 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
                                         child: Text(
-                                          event.eventMode,
-                                          style: TextStyle(
-                                            color: event.eventMode == 'Compulsary'
-                                                ? Colors.red[700]
-                                                : Colors.blue[700],
-                                            fontSize: 12,
+                                          event['Event_Name'] ?? 'No Name',
+                                          style: const TextStyle(
+                                            fontSize: 20,
                                             fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
                                           ),
                                         ),
                                       ),
-                                      const Spacer(),
-                                      Text(
-                                        event.eventDate,
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
                                     ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Event Details
+                                  _buildEventDetailRow(
+                                    Icons.calendar_today,
+                                    'Date',
+                                    event['Event_Date'] ?? 'N/A',
+                                    Colors.green,
                                   ),
                                   const SizedBox(height: 12),
-                                  Text(
-                                    event.eventName,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
-                                    ),
+                                  _buildEventDetailRow(
+                                    Icons.settings,
+                                    'Mode',
+                                    event['Event_Mode'] ?? 'N/A',
+                                    Colors.orange,
                                   ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.location_on,
-                                        size: 16,
-                                        color: Colors.grey[600],
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        event.place,
-                                        style: TextStyle(
-                                          color: Colors.grey[700],
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
+                                  const SizedBox(height: 12),
+                                  _buildEventDetailRow(
+                                    Icons.location_on,
+                                    'Place',
+                                    event['Place'] ?? 'N/A',
+                                    Colors.red,
                                   ),
-                                  if (event.feesCategory != null) ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.payment,
-                                          size: 16,
-                                          color: Colors.grey[600],
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${event.feesCategory!.desc} - ₹${event.feesCategory!.amount}',
-                                          style: TextStyle(
-                                            color: Colors.grey[700],
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                  if (event.groupMaster != null) ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.group,
-                                          size: 16,
-                                          color: Colors.grey[600],
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Organized by: ${event.groupMaster!.name}',
-                                          style: TextStyle(
-                                            color: Colors.grey[700],
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                  const SizedBox(height: 12),
+                                  _buildEventDetailRow(
+                                    Icons.currency_rupee,
+                                    'Fees',
+                                    '₹${event['fees_category']['Amount'] ?? 'N/A'}',
+                                    Colors.purple,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildEventDetailRow(
+                                    Icons.group,
+                                    'Group',
+                                    event['group_master']['group_name'] ?? 'N/A',
+                                    Colors.teal,
+                                  ),
                                 ],
                               ),
                             ),
                           );
                         },
                       ),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const CreateEventPage(),
+    );
+  }
+
+  Widget _buildEventDetailRow(IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 16,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
             ),
-          );
-          
-          if (result == true) {
-            loadEvents(); // Refresh the events list
-          }
-        },
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Create Event'),
-      ),
+          ),
+        ),
+      ],
     );
   }
 }
 
 class CreateEventPage extends StatefulWidget {
-  const CreateEventPage({Key? key}) : super(key: key);
+  const CreateEventPage({super.key});
 
   @override
   State<CreateEventPage> createState() => _CreateEventPageState();
@@ -623,49 +366,63 @@ class CreateEventPage extends StatefulWidget {
 class _CreateEventPageState extends State<CreateEventPage> {
   final _formKey = GlobalKey<FormState>();
   final _eventNameController = TextEditingController();
+  final _eventDateController = TextEditingController();
+  final _eventModeController = TextEditingController();
   final _placeController = TextEditingController();
-  
-  DateTime? _selectedDate;
-  String _selectedEventMode = 'Compulsary';
-  FeesCategory? _selectedFeesCategory;
-  List<FeesCategory> _feesCategories = [];
-  bool _isLoading = false;
-  bool _isLoadingCategories = true;
-
-  final List<String> _eventModes = ['Compulsary', 'Optional'];
+  String? _selectedFeesCatId;
+  List<dynamic> _feesCategories = [];
+  bool isLoading = false;
+  bool _isFetchingFees = true;
 
   @override
   void initState() {
     super.initState();
-    _loadFeesCategories();
+    _fetchFeesCategories();
   }
 
-  Future<void> _loadFeesCategories() async {
+  Future<void> _fetchFeesCategories() async {
     try {
-      final categories = await ApiService.getFeesCategories();
-      setState(() {
-        _feesCategories = categories;
-        _isLoadingCategories = false;
-      });
+      final response = await http.get(
+        Uri.parse('https://tagai.caxis.ca/public/api/fees-categories'),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('Fees categories response: $data');
+        setState(() {
+          _feesCategories = data;
+          _isFetchingFees = false;
+        });
+      } else {
+        print('Failed to fetch fees categories: Status code ${response.statusCode}, Response: ${response.body}');
+        setState(() {
+          _isFetchingFees = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load fees categories')),
+        );
+      }
     } catch (e) {
+      print('Error fetching fees categories: $e');
       setState(() {
-        _isLoadingCategories = false;
+        _isFetchingFees = false;
       });
-      _showErrorSnackBar('Failed to load fees categories: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error fetching fees categories')),
+      );
     }
   }
 
-  Future<void> _selectDate() async {
+  Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.black,
+            colorScheme: ColorScheme.light(
+              primary: Colors.blue[600]!,
               onPrimary: Colors.white,
               surface: Colors.white,
               onSurface: Colors.black,
@@ -675,84 +432,83 @@ class _CreateEventPageState extends State<CreateEventPage> {
         );
       },
     );
-
-    if (picked != null && picked != _selectedDate) {
+    if (picked != null) {
       setState(() {
-        _selectedDate = picked;
+        _eventDateController.text = DateFormat('yyyy-MM-dd').format(picked);
       });
     }
   }
 
-  Future<void> _createEvent() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    if (_selectedDate == null) {
-      _showErrorSnackBar('Please select an event date');
-      return;
-    }
-
-    if (_selectedFeesCategory == null) {
-      _showErrorSnackBar('Please select a fees category');
-      return;
-    }
+  Future<void> createEvent() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() {
-      _isLoading = true;
+      isLoading = true;
     });
 
+    final prefs = await SharedPreferences.getInstance();
+    final gId = prefs.getString('user_id');
+    final gropCode = prefs.getString('Grop_code');
+    print('Creating event with G_ID: $gId, Grop_code: $gropCode');
+
+    if (gId == null || gId.isEmpty) {
+      print('Error: Missing user_id in SharedPreferences');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User ID not found')),
+      );
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    final payload = {
+      'Event_Name': _eventNameController.text,
+      'Event_Date': _eventDateController.text,
+      'Event_Mode': _eventModeController.text,
+      'Place': _placeController.text,
+      'fees_cat_id': _selectedFeesCatId,
+      'G_ID': gId,
+      'M_ID': null,
+    };
+    print('Create event payload: $payload');
+
     try {
-      final event = Event(
-        eventName: _eventNameController.text.trim(),
-        eventDate: _selectedDate!.toIso8601String().split('T')[0],
-        eventMode: _selectedEventMode,
-        place: _placeController.text.trim(),
-        feesCatId: _selectedFeesCategory!.feesCatId.toString(),
-        gId: '33', // Will be overridden by API service
-        mId: '1',  // Will be overridden by API service
+      final response = await http.post(
+        Uri.parse('https://tagai.caxis.ca/public/api/event-cals'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
       );
 
-      final success = await ApiService.createEvent(event);
-
-      if (success) {
-        _showSuccessSnackBar('Event created successfully!');
-        Navigator.pop(context, true); // Return true to indicate success
+      if (response.statusCode == 201) {
+        print('Event created successfully');
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Event created successfully')),
+        );
       } else {
-        _showErrorSnackBar('Failed to create event. Please try again.');
+        print('Failed to create event: Status code ${response.statusCode}, Response: ${response.body}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to create event')),
+        );
       }
     } catch (e) {
-      _showErrorSnackBar('Error creating event: $e');
+      print('Error creating event: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('An error occurred')),
+      );
     } finally {
       setState(() {
-        _isLoading = false;
+        isLoading = false;
       });
     }
-  }
-
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   @override
   void dispose() {
     _eventNameController.dispose();
+    _eventDateController.dispose();
+    _eventModeController.dispose();
     _placeController.dispose();
     super.dispose();
   }
@@ -763,237 +519,160 @@ class _CreateEventPageState extends State<CreateEventPage> {
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(CupertinoIcons.back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
           'Create Event',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
       ),
-      body: _isLoadingCategories
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-              ),
-            )
+      body: _isFetchingFees
+          ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Event Details',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Event Details',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
                             ),
-                            const SizedBox(height: 20),
-                            
-                            // Event Name
-                            TextFormField(
-                              controller: _eventNameController,
-                              decoration: InputDecoration(
-                                labelText: 'Event Name',
-                                hintText: 'Enter event name',
-                                prefixIcon: const Icon(Icons.event, color: Colors.black54),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: Colors.black, width: 2),
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter event name';
-                                }
-                                return null;
-                              },
+                          ),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _eventNameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Event Name',
+                              prefixIcon: Icon(Icons.event),
+                              hintText: 'Enter event name',
                             ),
-                            const SizedBox(height: 16),
-
-                            // Event Date
-                            InkWell(
-                              onTap: _selectDate,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey),
-                                  borderRadius: BorderRadius.circular(8),
+                            validator: (value) =>
+                                value!.isEmpty ? 'Enter event name' : null,
+                          ),
+                          const SizedBox(height: 20),
+                          TextFormField(
+                            controller: _eventDateController,
+                            decoration: const InputDecoration(
+                              labelText: 'Event Date',
+                              prefixIcon: Icon(Icons.calendar_today),
+                              suffixIcon: Icon(Icons.arrow_drop_down),
+                              hintText: 'Select event date',
+                            ),
+                            readOnly: true,
+                            onTap: () => _selectDate(context),
+                            validator: (value) =>
+                                value!.isEmpty ? 'Select event date' : null,
+                          ),
+                          const SizedBox(height: 20),
+                          TextFormField(
+                            controller: _eventModeController,
+                            decoration: const InputDecoration(
+                              labelText: 'Event Mode',
+                              prefixIcon: Icon(Icons.settings),
+                              hintText: 'Enter event mode',
+                            ),
+                            validator: (value) =>
+                                value!.isEmpty ? 'Enter event mode' : null,
+                          ),
+                          const SizedBox(height: 20),
+                          TextFormField(
+                            controller: _placeController,
+                            decoration: const InputDecoration(
+                              labelText: 'Place',
+                              prefixIcon: Icon(Icons.location_on),
+                              hintText: 'Enter event location',
+                            ),
+                            validator: (value) =>
+                                value!.isEmpty ? 'Enter place' : null,
+                          ),
+                          const SizedBox(height: 20),
+                          DropdownButtonFormField<String>(
+                            value: _selectedFeesCatId,
+                            decoration: const InputDecoration(
+                              labelText: 'Fees Category',
+                              prefixIcon: Icon(Icons.currency_rupee),
+                              hintText: 'Select fees category',
+                            ),
+                            items: _feesCategories.map((category) {
+                              return DropdownMenuItem<String>(
+                                value: category['fees_cat_id'].toString(),
+                                child: Text(
+                                  '${category['Desc'] ?? 'Unknown'} - ₹${category['Amount'] ?? '0'}',
+                                  style: const TextStyle(fontSize: 14),
                                 ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.calendar_today, color: Colors.black54),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      _selectedDate == null
-                                          ? 'Select Event Date'
-                                          : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedFeesCatId = value;
+                              });
+                            },
+                            validator: (value) =>
+                                value == null ? 'Select a fees category' : null,
+                          ),
+                          const SizedBox(height: 32),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: isLoading ? null : createEvent,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue[600],
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 2,
+                              ),
+                              child: isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Create Event',
                                       style: TextStyle(
+                                        color: Colors.white,
                                         fontSize: 16,
-                                        color: _selectedDate == null ? Colors.grey[600] : Colors.black87,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    const Spacer(),
-                                    const Icon(Icons.arrow_drop_down, color: Colors.black54),
-                                  ],
-                                ),
-                              ),
                             ),
-                            const SizedBox(height: 16),
-
-                            // Event Mode
-                            DropdownButtonFormField<String>(
-                              value: _selectedEventMode,
-                              decoration: InputDecoration(
-                                labelText: 'Event Mode',
-                                prefixIcon: const Icon(Icons.mode_edit, color: Colors.black54),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: Colors.black, width: 2),
-                                ),
-                              ),
-                              items: _eventModes.map((mode) {
-                                return DropdownMenuItem<String>(
-                                  value: mode,
-                                  child: Text(mode),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedEventMode = value!;
-                                });
-                              },
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Place
-                            TextFormField(
-                              controller: _placeController,
-                              decoration: InputDecoration(
-                                labelText: 'Place',
-                                hintText: 'Enter event location',
-                                prefixIcon: const Icon(Icons.location_on, color: Colors.black54),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: Colors.black, width: 2),
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter event location';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Fees Category
-                            DropdownButtonFormField<FeesCategory>(
-                              value: _selectedFeesCategory,
-                              decoration: InputDecoration(
-                                labelText: 'Fees Category',
-                                prefixIcon: const Icon(Icons.payment, color: Colors.black54),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: Colors.black, width: 2),
-                                ),
-                              ),
-                              hint: const Text('Select fees category'),
-                              isExpanded: true, // Allow dropdown to use available width
-                              items: _feesCategories.map((category) {
-                                return DropdownMenuItem<FeesCategory>(
-                                  value: category,
-                                  child: SizedBox(
-                                    width: double.infinity, // Use available width
-                                    child: Text(
-                                      '${category.desc} (₹${category.amount}, Late: ₹${category.lateCharge})',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 12,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedFeesCategory = value;
-                                });
-                              },
-                              validator: (value) {
-                                if (value == null) {
-                                  return 'Please select a fees category';
-                                }
-                                return null;
-                              },
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Create Event Button
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _createEvent,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 2,
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Text(
-                              'Create Event',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
