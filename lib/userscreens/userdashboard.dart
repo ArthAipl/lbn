@@ -27,7 +27,7 @@ class _UserDashboardState extends State<UserDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: _buildAppBar(),
       drawer: _buildDrawer(),
       body: _buildBody(),
@@ -49,7 +49,8 @@ class _UserDashboardState extends State<UserDashboard> {
         style: TextStyle(
           color: Colors.white,
           fontSize: 20,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
         ),
       ),
     );
@@ -62,40 +63,52 @@ class _UserDashboardState extends State<UserDashboard> {
         child: Column(
           children: [
             Container(
-              height: 200,
+              height: 220,
               width: double.infinity,
               decoration: const BoxDecoration(
-                color: Colors.black,
+                gradient: LinearGradient(
+                  colors: [Colors.black, Color(0xFF2C2C2C)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
-              child: const Padding(
-                padding: EdgeInsets.all(20),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    CircleAvatar(
-                      radius: 35,
-                      backgroundColor: Colors.white24,
-                      child: Icon(
-                        Icons.person,
-                        size: 40,
-                        color: Colors.white,
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white24, width: 2),
+                      ),
+                      child: const CircleAvatar(
+                        radius: 32,
+                        backgroundColor: Colors.white12,
+                        child: Icon(
+                          Icons.person_outline,
+                          size: 36,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                    SizedBox(height: 15),
-                    Text(
+                    const SizedBox(height: 16),
+                    const Text(
                       'John Doe',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Text(
+                    const Text(
                       'CEO, TechVentures',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
@@ -106,46 +119,50 @@ class _UserDashboardState extends State<UserDashboard> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
+                  const SizedBox(height: 16),
                   _buildDrawerItem(
-                    icon: Icons.person,
+                    icon: Icons.person_outline,
                     title: 'Profile',
                     index: 0,
                     isNavigationItem: true,
                   ),
                   _buildDrawerItem(
-                    icon: Icons.dashboard,
+                    icon: Icons.dashboard_outlined,
                     title: 'Dashboard',
                     index: 1,
                   ),
                   _buildDrawerItem(
-                    icon: Icons.people,
+                    icon: Icons.people_outline,
                     title: 'Members',
                     index: 2,
                     isNavigationItem: true,
                   ),
                   _buildDrawerItem(
-                    icon: Icons.meeting_room,
+                    icon: Icons.meeting_room_outlined,
                     title: 'Meetings',
                     index: 3,
                   ),
                   _buildDrawerItem(
-                    icon: Icons.event,
+                    icon: Icons.event_outlined,
                     title: 'Events',
                     index: 4,
                   ),
                   _buildDrawerItem(
-                    icon: Icons.person_add,
+                    icon: Icons.person_add_outlined,
                     title: 'One-to-One',
                     index: 5,
                   ),
-                  const Divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Divider(color: Colors.grey[300]),
+                  ),
                   _buildDrawerItem(
-                    icon: Icons.settings,
+                    icon: Icons.settings_outlined,
                     title: 'Settings',
                     index: 6,
                   ),
                   _buildDrawerItem(
-                    icon: Icons.logout,
+                    icon: Icons.logout_outlined,
                     title: 'Logout',
                     index: 7,
                     isLogout: true,
@@ -169,21 +186,24 @@ class _UserDashboardState extends State<UserDashboard> {
     bool isSelected = _selectedIndex == index;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: isSelected ? Colors.black.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        color: isSelected ? Colors.black.withOpacity(0.08) : Colors.transparent,
       ),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Icon(
           icon,
           color: isSelected ? Colors.black : Colors.grey[600],
+          size: 22,
         ),
         title: Text(
           title,
           style: TextStyle(
-            color: isSelected ? Colors.black : Colors.grey[600],
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? Colors.black : Colors.grey[700],
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            fontSize: 15,
           ),
         ),
         onTap: () async {
@@ -191,16 +211,17 @@ class _UserDashboardState extends State<UserDashboard> {
             bool? confirm = await showDialog(
               context: context,
               builder: (context) => AlertDialog(
-                title: const Text('Logout'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: const Text('Logout', style: TextStyle(fontWeight: FontWeight.w600)),
                 content: const Text('Are you sure you want to log out?'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel'),
+                    child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Logout'),
+                    child: const Text('Logout', style: TextStyle(color: Colors.black)),
                   ),
                 ],
               ),
@@ -267,140 +288,223 @@ class _UserDashboardState extends State<UserDashboard> {
   }
 
   Widget _buildDashboard() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Colors.black, Colors.grey],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(20),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              // Welcome Section
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Colors.black, Color(0xFF2C2C2C)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back!',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Ready to network?',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome back!',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                  ),
+              
+              const SizedBox(height: 24),
+              
+              // Section Title
+              const Text(
+                'Quick Actions',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                  letterSpacing: -0.3,
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'Ready to network?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ]),
           ),
-          const SizedBox(height: 40),
-          Expanded(
-            child: GridView.count(
+        ),
+        
+        // Feature Grid - First Row
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              children: [
-                _buildFeatureCard(
-                  'Business Profile',
-                  Icons.business,
-                  Colors.red,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const BusinessPage()),
-                    );
-                  },
-                ),
-                _buildFeatureCard(
-                  'Members',
-                  Icons.people,
-                  Colors.blue,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const MemberListPage()),
-                    );
-                  },
-                ),
-                _buildFeatureCard(
-                  'Events',
-                  Icons.event,
-                  Colors.green,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const EventsPage()),
-                    );
-                  },
-                ),
-                _buildFeatureCard(
-                  'Meetings',
-                  Icons.meeting_room,
-                  Colors.orange,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const MeetingsPage()),
-                    );
-                  },
-                ),
-                _buildFeatureCard(
-                  'One-to-One',
-                  Icons.person_add,
-                  Colors.purple,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const OneToOnePage()),
-                    );
-                  },
-                ),
-                _buildFeatureCard(
-                  'Circle Meeting',
-                  Icons.group,
-                  Colors.teal,
-                   onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) =>  CircleMeetingPage()),
-          );
-        },
-                ),
-                _buildFeatureCard(
-                  'Visitors',
-                  Icons.person_pin,
-                  Colors.indigo,
-                  onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const VisitorManagementScreen()),
-          );
-        },
-                ),
-                _buildFeatureCard(
-                  'Reference',
-                  Icons.bookmark,
-                  Colors.amber,
-                    onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) =>  ReferencePage()),
-          );
-        },
-                ),
-              ],
+              childAspectRatio: 1.3,
+            ),
+            delegate: SliverChildListDelegate([
+              _buildFeatureCard(
+                'Business Profile',
+                'Business information',
+                Icons.business_outlined,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const BusinessPage()),
+                  );
+                },
+              ),
+              _buildFeatureCard(
+                'Members',
+                'Network members',
+                Icons.people_outline,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const MemberListPage()),
+                  );
+                },
+              ),
+              _buildFeatureCard(
+                'Events',
+                'Networking Events',
+                Icons.event_outlined,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const EventsPage()),
+                  );
+                },
+              ),
+              _buildFeatureCard(
+                'Meetings',
+                'Network Meetings',
+                Icons.meeting_room_outlined,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const MeetingsPage()),
+                  );
+                },
+              ),
+              _buildFeatureCard(
+                'One-to-One',
+                'Personal connections',
+                Icons.person_add_outlined,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const OneToOnePage()),
+                  );
+                },
+              ),
+              _buildFeatureCard(
+                'Circle Meeting',
+                'Group discussions',
+                Icons.group_outlined,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => CircleMeetingPage()),
+                  );
+                },
+              ),
+              _buildFeatureCard(
+                'Visitors',
+                'Manage guest access',
+                Icons.person_pin_outlined,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const VisitorManagementScreen()),
+                  );
+                },
+              ),
+              _buildFeatureCard(
+                'Reference',
+                'Important resources',
+                Icons.bookmark_outline,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => ReferencePage()),
+                  );
+                },
+              ),
+            ]),
+          ),
+        ),
+        
+        // Bottom padding
+        const SliverPadding(
+          padding: EdgeInsets.only(bottom: 20),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 22,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600],
             ),
           ),
         ],
@@ -408,46 +512,64 @@ class _UserDashboardState extends State<UserDashboard> {
     );
   }
 
-  Widget _buildFeatureCard(String title, IconData icon, Color color, {VoidCallback? onTap}) {
+  Widget _buildFeatureCard(String title, String subtitle, IconData icon, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.grey.withOpacity(0.1)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  size: 24,
+                  color: Colors.black87,
+                ),
               ),
-              child: Icon(
-                icon,
-                size: 40,
-                color: color,
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                  letterSpacing: -0.2,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.grey[600],
+                  height: 1.2,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -459,9 +581,9 @@ class _UserDashboardState extends State<UserDashboard> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.people,
+            Icons.people_outline,
             size: 80,
-            color: Colors.blue,
+            color: Colors.black54,
           ),
           SizedBox(height: 16),
           Text(
@@ -491,9 +613,9 @@ class _UserDashboardState extends State<UserDashboard> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.meeting_room,
+            Icons.meeting_room_outlined,
             size: 80,
-            color: Colors.orange,
+            color: Colors.black54,
           ),
           SizedBox(height: 16),
           Text(
@@ -523,9 +645,9 @@ class _UserDashboardState extends State<UserDashboard> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.event,
+            Icons.event_outlined,
             size: 80,
-            color: Colors.green,
+            color: Colors.black54,
           ),
           SizedBox(height: 16),
           Text(
@@ -555,9 +677,9 @@ class _UserDashboardState extends State<UserDashboard> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.person_add,
+            Icons.person_add_outlined,
             size: 80,
-            color: Colors.purple,
+            color: Colors.black54,
           ),
           SizedBox(height: 16),
           Text(
