@@ -683,47 +683,45 @@ class MeetingCard extends StatelessWidget {
                     statusActive: meeting.attendanceStatus == '1',
                   ),
                   
-                  // Compact Action Buttons for Today/Upcoming meetings
-                  if (isToday || isUpcoming) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      height: 0.5,
-                      color: Colors.grey[300],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildCompactActionButton(
-                            context: context,
-                            label: 'VISITOR',
-                            icon: Icons.person_add_outlined,
-                            isPrimary: false,
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AddVisitorPage(meeting: meeting),
-                                ),
-                              );
-                            },
-                          ),
+                  // Action Buttons for ALL meetings (removed conditional check)
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 0.5,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildCompactActionButton(
+                          context: context,
+                          label: 'VISITOR',
+                          icon: Icons.person_add_outlined,
+                          isPrimary: false,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AddVisitorPage(meeting: meeting),
+                              ),
+                            );
+                          },
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildCompactActionButton(
-                            context: context,
-                            label: 'PRESENT',
-                            icon: Icons.present_to_all_outlined,
-                            isPrimary: true,
-                            onPressed: () {
-                              _showPresentationDialog(context, meeting);
-                            },
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildCompactActionButton(
+                          context: context,
+                          label: 'PRESENT',
+                          icon: Icons.present_to_all_outlined,
+                          isPrimary: true,
+                          onPressed: () {
+                            _showPresentationDialog(context, meeting);
+                          },
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1146,86 +1144,85 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
                               return _buildPresentationCard(presentations[index]);
                             },
                           ),
-            if (isToday || isUpcoming) ...[
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => AddVisitorPage(meeting: widget.meeting),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: const BorderSide(color: Colors.black, width: 1.5),
+            // Action Buttons for ALL meetings (removed conditional check)
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddVisitorPage(meeting: widget.meeting),
                           ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: const BorderSide(color: Colors.black, width: 1.5),
                         ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.person_add_outlined, size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              'ADD VISITOR',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.3,
-                              ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.person_add_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'ADD VISITOR',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          _showPresentationDialog(context, widget.meeting);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _showPresentationDialog(context, widget.meeting);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.present_to_all_outlined, size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              'PRESENTATION',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.3,
-                              ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.present_to_all_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'PRESENTATION',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1718,7 +1715,7 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
   }
 }
 
-// Keep all your existing model classes unchanged
+// Model classes remain unchanged
 class Visitor {
   final String name;
   final String about;

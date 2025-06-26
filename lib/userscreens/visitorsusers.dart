@@ -704,24 +704,9 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'User: ${userName ?? 'Unknown'} | G_ID: ${groupId ?? 'Not Set'}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
+                  ), 
                   if (validGroupIds.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Valid G_IDs: ${validGroupIds.join(', ')}',
-                      style: const TextStyle(
-                        color: Colors.white60,
-                        fontSize: 12,
-                      ),
-                    ),
+                    const SizedBox(height: 4),  
                   ],
                 ],
               ),
