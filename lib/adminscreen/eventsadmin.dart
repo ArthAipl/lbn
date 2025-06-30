@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Events Admin',
+      title: 'Events',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         inputDecorationTheme: InputDecorationTheme(
@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.blue, width: 2),
+            borderSide: const BorderSide(color: Colors.black, width: 2),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -56,24 +56,51 @@ class EventsAdminPage extends StatefulWidget {
   State<EventsAdminPage> createState() => _EventsAdminPageState();
 }
 
-class _EventsAdminPageState extends State<EventsAdminPage> {
+class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProviderStateMixin {
   List<dynamic> events = [];
   bool isLoading = true;
   String? gropCode;
   String? gId;
+  
+  // Create Event Form Controllers
+  final _formKey = GlobalKey<FormState>();
+  final _eventNameController = TextEditingController();
+  final _eventDateController = TextEditingController();
+  final _eventModeController = TextEditingController();
+  final _placeController = TextEditingController();
+  String? _selectedFeesCatId;
+  List<dynamic> _feesCategories = [];
+  bool isCreating = false;
+  bool _isFetchingFees = true;
+  
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     fetchEvents();
+    _fetchFeesCategories();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _eventNameController.dispose();
+    _eventDateController.dispose();
+    _eventModeController.dispose();
+    _placeController.dispose();
+    super.dispose();
   }
 
   Future<void> fetchEvents() async {
     final prefs = await SharedPreferences.getInstance();
     gropCode = prefs.getString('Grop_code');
     gId = prefs.getString('user_id');
+
     print('Retrieved Grop_code: $gropCode');
     print('Retrieved G_ID: $gId');
+
     if (gId == null || gId!.isEmpty) {
       print('Error: G_ID is null or empty');
       setState(() {
@@ -86,8 +113,8 @@ class _EventsAdminPageState extends State<EventsAdminPage> {
       return;
     }
 
-    // Fallback to G_ID filtering if Grop_code is missing
     bool useGropCode = gropCode != null && gropCode!.isNotEmpty;
+
     try {
       final response = await http.get(
         Uri.parse('https://tagai.caxis.ca/public/api/event-cals'),
@@ -96,6 +123,7 @@ class _EventsAdminPageState extends State<EventsAdminPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         print('API response: $data');
+
         setState(() {
           events = data
               .where((event) {
@@ -108,6 +136,7 @@ class _EventsAdminPageState extends State<EventsAdminPage> {
               .toList();
           isLoading = false;
         });
+
         print('Filtered events: $events');
       } else {
         print('API error: Status code ${response.statusCode}, Response: ${response.body}');
@@ -129,265 +158,16 @@ class _EventsAdminPageState extends State<EventsAdminPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(CupertinoIcons.back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Events Admin',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          // Create Event Button Section
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16.0),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CreateEventPage(),
-                  ),
-                ).then((_) => fetchEvents());
-              },
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'Create New Event',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 2,
-              ),
-            ),
-          ),
-          // Events List
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : events.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.event_busy,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No events found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16.0),
-                        itemCount: events.length,
-                        itemBuilder: (context, index) {
-                          final event = events[index];
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 16.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(20.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Event Name with Icon
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue[50],
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Icon(
-                                          Icons.event,
-                                          color: Colors.blue[600],
-                                          size: 20,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          event['Event_Name'] ?? 'No Name',
-                                          style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  // Event Details
-                                  _buildEventDetailRow(
-                                    Icons.calendar_today,
-                                    'Date',
-                                    event['Event_Date'] ?? 'N/A',
-                                    Colors.green,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildEventDetailRow(
-                                    Icons.settings,
-                                    'Mode',
-                                    event['Event_Mode'] ?? 'N/A',
-                                    Colors.orange,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildEventDetailRow(
-                                    Icons.location_on,
-                                    'Place',
-                                    event['Place'] ?? 'N/A',
-                                    Colors.red,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildEventDetailRow(
-                                    Icons.currency_rupee,
-                                    'Fees',
-                                    '₹${event['fees_category']['Amount'] ?? 'N/A'}',
-                                    Colors.purple,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildEventDetailRow(
-                                    Icons.group,
-                                    'Group',
-                                    event['group_master']['group_name'] ?? 'N/A',
-                                    Colors.teal,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEventDetailRow(IconData icon, String label, String value, Color color) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 16,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          '$label: ',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class CreateEventPage extends StatefulWidget {
-  const CreateEventPage({super.key});
-
-  @override
-  State<CreateEventPage> createState() => _CreateEventPageState();
-}
-
-class _CreateEventPageState extends State<CreateEventPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _eventNameController = TextEditingController();
-  final _eventDateController = TextEditingController();
-  final _eventModeController = TextEditingController();
-  final _placeController = TextEditingController();
-  String? _selectedFeesCatId;
-  List<dynamic> _feesCategories = [];
-  bool isLoading = false;
-  bool _isFetchingFees = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchFeesCategories();
-  }
-
   Future<void> _fetchFeesCategories() async {
     try {
       final response = await http.get(
         Uri.parse('https://tagai.caxis.ca/public/api/fees-categories'),
       );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         print('Fees categories response: $data');
+
         setState(() {
           _feesCategories = data;
           _isFetchingFees = false;
@@ -422,7 +202,7 @@ class _CreateEventPageState extends State<CreateEventPage> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: Colors.blue[600]!,
+              primary: Colors.black,
               onPrimary: Colors.white,
               surface: Colors.white,
               onSurface: Colors.black,
@@ -432,6 +212,7 @@ class _CreateEventPageState extends State<CreateEventPage> {
         );
       },
     );
+
     if (picked != null) {
       setState(() {
         _eventDateController.text = DateFormat('yyyy-MM-dd').format(picked);
@@ -443,12 +224,13 @@ class _CreateEventPageState extends State<CreateEventPage> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
-      isLoading = true;
+      isCreating = true;
     });
 
     final prefs = await SharedPreferences.getInstance();
     final gId = prefs.getString('user_id');
     final gropCode = prefs.getString('Grop_code');
+
     print('Creating event with G_ID: $gId, Grop_code: $gropCode');
 
     if (gId == null || gId.isEmpty) {
@@ -457,7 +239,7 @@ class _CreateEventPageState extends State<CreateEventPage> {
         const SnackBar(content: Text('User ID not found')),
       );
       setState(() {
-        isLoading = false;
+        isCreating = false;
       });
       return;
     }
@@ -471,6 +253,7 @@ class _CreateEventPageState extends State<CreateEventPage> {
       'G_ID': gId,
       'M_ID': null,
     };
+
     print('Create event payload: $payload');
 
     try {
@@ -482,7 +265,20 @@ class _CreateEventPageState extends State<CreateEventPage> {
 
       if (response.statusCode == 201) {
         print('Event created successfully');
-        Navigator.pop(context);
+        
+        // Clear form
+        _eventNameController.clear();
+        _eventDateController.clear();
+        _eventModeController.clear();
+        _placeController.clear();
+        setState(() {
+          _selectedFeesCatId = null;
+        });
+        
+        // Switch to events tab and refresh
+        _tabController.animateTo(1);
+        fetchEvents();
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Event created successfully')),
         );
@@ -499,18 +295,9 @@ class _CreateEventPageState extends State<CreateEventPage> {
       );
     } finally {
       setState(() {
-        isLoading = false;
+        isCreating = false;
       });
     }
-  }
-
-  @override
-  void dispose() {
-    _eventNameController.dispose();
-    _eventDateController.dispose();
-    _eventModeController.dispose();
-    _placeController.dispose();
-    super.dispose();
   }
 
   @override
@@ -525,157 +312,395 @@ class _CreateEventPageState extends State<CreateEventPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Create Event',
+          'Events',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.grey[400],
+          labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+          tabs: const [
+            Tab(
+             
+              text: 'Create Event',
+            ),
+            Tab(
+              
+              text: 'All Events',
+            ),
+          ],
+        ),
       ),
-      body: _isFetchingFees
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Event Details',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Create Event Tab
+          _buildCreateEventTab(),
+          // All Events Tab
+          _buildAllEventsTab(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCreateEventTab() {
+    return _isFetchingFees
+        ? const Center(child: CircularProgressIndicator(color: Colors.black))
+        : SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _eventNameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Event Name',
-                              prefixIcon: Icon(Icons.event),
-                              hintText: 'Enter event name',
-                            ),
-                            validator: (value) =>
-                                value!.isEmpty ? 'Enter event name' : null,
-                          ),
-                          const SizedBox(height: 20),
-                          TextFormField(
-                            controller: _eventDateController,
-                            decoration: const InputDecoration(
-                              labelText: 'Event Date',
-                              prefixIcon: Icon(Icons.calendar_today),
-                              suffixIcon: Icon(Icons.arrow_drop_down),
-                              hintText: 'Select event date',
-                            ),
-                            readOnly: true,
-                            onTap: () => _selectDate(context),
-                            validator: (value) =>
-                                value!.isEmpty ? 'Select event date' : null,
-                          ),
-                          const SizedBox(height: 20),
-                          TextFormField(
-                            controller: _eventModeController,
-                            decoration: const InputDecoration(
-                              labelText: 'Event Mode',
-                              prefixIcon: Icon(Icons.settings),
-                              hintText: 'Enter event mode',
-                            ),
-                            validator: (value) =>
-                                value!.isEmpty ? 'Enter event mode' : null,
-                          ),
-                          const SizedBox(height: 20),
-                          TextFormField(
-                            controller: _placeController,
-                            decoration: const InputDecoration(
-                              labelText: 'Place',
-                              prefixIcon: Icon(Icons.location_on),
-                              hintText: 'Enter event location',
-                            ),
-                            validator: (value) =>
-                                value!.isEmpty ? 'Enter place' : null,
-                          ),
-                          const SizedBox(height: 20),
-                          DropdownButtonFormField<String>(
-                            value: _selectedFeesCatId,
-                            decoration: const InputDecoration(
-                              labelText: 'Fees Category',
-                              prefixIcon: Icon(Icons.currency_rupee),
-                              hintText: 'Select fees category',
-                            ),
-                            items: _feesCategories.map((category) {
-                              return DropdownMenuItem<String>(
-                                value: category['fees_cat_id'].toString(),
-                                child: Text(
-                                  '${category['Desc'] ?? 'Unknown'} - ₹${category['Amount'] ?? '0'}',
-                                  style: const TextStyle(fontSize: 14),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.event_available, color: Colors.white, size: 24),
+                              SizedBox(width: 12),
+                              Text(
+                                'Create New Event',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedFeesCatId = value;
-                              });
-                            },
-                            validator: (value) =>
-                                value == null ? 'Select a fees category' : null,
-                          ),
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: isLoading ? null : createEvent,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue[600],
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 2,
                               ),
-                              child: isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Create Event',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 24),
+                        TextFormField(
+                          controller: _eventNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Event Name',
+                            prefixIcon: Icon(Icons.event, color: Colors.black),
+                            hintText: 'Enter event name',
+                          ),
+                          validator: (value) =>
+                              value!.isEmpty ? 'Enter event name' : null,
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: _eventDateController,
+                          decoration: const InputDecoration(
+                            labelText: 'Event Date',
+                            prefixIcon: Icon(Icons.calendar_today, color: Colors.black),
+                            suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.black),
+                            hintText: 'Select event date',
+                          ),
+                          readOnly: true,
+                          onTap: () => _selectDate(context),
+                          validator: (value) =>
+                              value!.isEmpty ? 'Select event date' : null,
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: _eventModeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Event Mode',
+                            prefixIcon: Icon(Icons.settings, color: Colors.black),
+                            hintText: 'Enter event mode',
+                          ),
+                          validator: (value) =>
+                              value!.isEmpty ? 'Enter event mode' : null,
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: _placeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Place',
+                            prefixIcon: Icon(Icons.location_on, color: Colors.black),
+                            hintText: 'Enter event location',
+                          ),
+                          validator: (value) =>
+                              value!.isEmpty ? 'Enter place' : null,
+                        ),
+                        const SizedBox(height: 20),
+DropdownButtonFormField<String>(
+  value: _selectedFeesCatId,
+  decoration: const InputDecoration(
+    labelText: 'Fees Category',
+    prefixIcon: Icon(Icons.currency_rupee, color: Colors.black),
+    hintText: 'Select fees category',
+  ),
+  items: _feesCategories.map<DropdownMenuItem<String>>((category) {
+    return DropdownMenuItem<String>(
+      value: category['fees_cat_id'].toString(),
+      child: Text(
+        '${category['Desc'] ?? 'Unknown'} - ₹${category['Amount'] ?? '0'}',
+        style: const TextStyle(fontSize: 14),
+      ),
+    );
+  }).toList(),
+  onChanged: (value) {
+    setState(() {
+      _selectedFeesCatId = value;
+    });
+  },
+  validator: (value) =>
+      value == null ? 'Select a fees category' : null,
+),
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: isCreating ? null : createEvent,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 4,
+                            ),
+                            child: isCreating
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Create Event',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
+          );
+  }
+
+  Widget _buildAllEventsTab() {
+    return RefreshIndicator(
+      color: Colors.black,
+      onRefresh: fetchEvents,
+      child: isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.black))
+          : events.isEmpty
+              ? ListView(
+                  children: [
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.event_busy,
+                              size: 64,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          Text(
+                            'No events found',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Create your first event using the Create Event tab',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[500],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16.0),
+                  itemCount: events.length,
+                  itemBuilder: (context, index) {
+                    final event = events[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.grey[200]!, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Header with black background
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20.0),
+                            decoration: const BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                topRight: Radius.circular(20),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.event,
+                                    color: Colors.black,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Text(
+                                    event['Event_Name'] ?? 'No Name',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Content with white background
+                          Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Column(
+                              children: [
+                                _buildEventDetailRow(
+                                  Icons.calendar_today,
+                                  'Date',
+                                  event['Event_Date'] ?? 'N/A',
+                                  Colors.black,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildEventDetailRow(
+                                  Icons.settings,
+                                  'Mode',
+                                  event['Event_Mode'] ?? 'N/A',
+                                  Colors.black,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildEventDetailRow(
+                                  Icons.location_on,
+                                  'Place',
+                                  event['Place'] ?? 'N/A',
+                                  Colors.black,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildEventDetailRow(
+                                  Icons.currency_rupee,
+                                  'Fees',
+                                  '₹${event['fees_category']['Amount'] ?? 'N/A'}',
+                                  Colors.black,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildEventDetailRow(
+                                  Icons.group,
+                                  'Group',
+                                  event['group_master']['group_name'] ?? 'N/A',
+                                  Colors.black,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+    );
+  }
+
+  Widget _buildEventDetailRow(IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 18,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
