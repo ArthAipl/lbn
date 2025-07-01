@@ -5,57 +5,101 @@ import 'dart:convert';
 import 'dart:async';
 
 Future<void> _showPresentationDialog(BuildContext context, Meeting meeting) async {
-  return showDialog<void>(
-    context: context,
-    barrierDismissible: false, // User must tap a button to close
-    builder: (BuildContext dialogContext) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text(
-          'Give Presentation?',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-        ),
-        content: const Text(
-          'Would you like to give a presentation in this meeting?',
-          style: TextStyle(fontSize: 14, color: Colors.grey),
-        ),
-        actions: <Widget>[
-          TextButton(
-            child: const Text(
-              'No',
-              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+  try {
+    // Check presentation slots before showing dialog
+    final slotResponse = await http.get(
+      Uri.parse('https://tagai.caxis.ca/public/api/pres-tracks?M_C_Id=${meeting.mcId}'),
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 30));
+
+    if (slotResponse.statusCode == 200) {
+      final data = json.decode(slotResponse.body);
+      List<dynamic> presentationData = data is List ? data : data['data'] ?? [];
+      int presentationCount = presentationData
+          .where((item) => item['M_C_Id'].toString() == meeting.mcId.toString())
+          .length;
+
+      // Assuming a maximum of 3 presentation slots per meeting
+      const int maxSlots = 3;
+      if (presentationCount >= maxSlots) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Presentation slots are full for this meeting'),
+              backgroundColor: Colors.black,
+              duration: Duration(seconds: 3),
             ),
-            onPressed: () {
-              Navigator.of(dialogContext).pop(); // Close dialog
-              _submitPresentationStatus(context, meeting, '1'); // Pres_Status = 1 for No
-            },
+          );
+        }
+        return;
+      }
+    } else {
+      throw Exception('Failed to check presentation slots: ${slotResponse.statusCode}');
+    }
+
+    // Show dialog if slots are available
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text(
+            'Give Presentation?',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
-          TextButton(
-            child: const Text(
-              'Yes',
-              style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+          content: const Text(
+            'Would you like to give a presentation in this meeting?',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text(
+                'No',
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+              ),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                _submitPresentationStatus(context, meeting, '1');
+              },
             ),
-            onPressed: () {
-              Navigator.of(dialogContext).pop(); // Close dialog
-              _submitPresentationStatus(context, meeting, '0'); // Pres_Status = 0 for Yes
-            },
-          ),
-        ],
+            TextButton(
+              child: const Text(
+                'Yes',
+                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+              ),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                _submitPresentationStatus(context, meeting, '0');
+              },
+            ),
+          ],
+        );
+      },
+    );
+  } catch (e) {
+    print('Error checking presentation slots: $e');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error checking presentation slots: ${e.toString()}'),
+          backgroundColor: Colors.black,
+          duration: const Duration(seconds: 3),
+        ),
       );
-    },
-  );
+    }
+  }
 }
 
 Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, String presStatus) async {
   try {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? userId = prefs.getString('user_id'); // M_ID
+    String? userId = prefs.getString('user_id');
 
     if (userId == null) {
       throw Exception('Missing user_id in SharedPreferences');
     }
 
-    // Format current timestamp for created_at and updated_at
     final now = DateTime.now().toIso8601String();
     final payload = {
       'M_C_Id': meeting.mcId.toString(),
@@ -66,7 +110,6 @@ Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, St
       'updated_at': now,
     };
 
-    // Log the payload for debugging
     print('Submitting presentation status with payload: ${json.encode(payload)}');
 
     final response = await http.post(
@@ -87,13 +130,11 @@ Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, St
       }
       print('Presentation status updated successfully: Status Code ${response.statusCode}');
     } else {
-      // Log error details
       print('Failed to update presentation status: Status Code ${response.statusCode}');
       print('Response Body: ${response.body}');
       throw Exception('Failed to update presentation status: ${response.statusCode} - ${response.body}');
     }
   } catch (e) {
-    // Log exception details
     print('Error updating presentation status: $e');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -194,7 +235,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
         List<Meeting> meetings = [];
         for (var item in data) {
           Meeting meeting = Meeting.fromJson(item as Map<String, dynamic>);
-          if (meeting.group?.gropCode == userGroupCode) {
+          if (meeting.group?.gropCode == userGroupCode && meeting.meetingCategory.toLowerCase() == 'general') {
             meetings.add(meeting);
           }
         }
@@ -333,7 +374,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () {
-            Navigator.pop(context); // Go back when pressed
+            Navigator.pop(context);
           },
         ),
         title: const Text(
@@ -496,7 +537,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              allMeetings.isEmpty ? 'No meetings found for your group' : 'Try adjusting your search or filters',
+              allMeetings.isEmpty ? 'No general meetings found for your group' : 'Try adjusting your search or filters',
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
@@ -560,7 +601,6 @@ class MeetingCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // Compact Header Section
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -578,7 +618,6 @@ class MeetingCard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Status Badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -620,13 +659,10 @@ class MeetingCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Category Badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: meeting.meetingCategory.toLowerCase() == 'compulsory'
-                          ? Colors.black
-                          : Colors.white,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: Colors.black,
@@ -635,10 +671,8 @@ class MeetingCard extends StatelessWidget {
                     ),
                     child: Text(
                       meeting.meetingCategory.toUpperCase(),
-                      style: TextStyle(
-                        color: meeting.meetingCategory.toLowerCase() == 'compulsory'
-                            ? Colors.white
-                            : Colors.black,
+                      style: const TextStyle(
+                        color: Colors.black,
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.3,
@@ -648,13 +682,10 @@ class MeetingCard extends StatelessWidget {
                 ],
               ),
             ),
-            
-            // Compact Content Section
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  // Date Display
                   Text(
                     formatDate(meetingDate),
                     style: const TextStyle(
@@ -665,25 +696,18 @@ class MeetingCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  
-                  // Location Info
                   _buildCompactInfoRow(
                     icon: Icons.location_on_outlined,
                     content: meeting.place,
                     subtitle: meeting.groupLocation.isNotEmpty ? meeting.groupLocation : null,
                   ),
-                  
                   const SizedBox(height: 8),
-                  
-                  // Attendance Status
                   _buildCompactInfoRow(
                     icon: Icons.people_outline,
                     content: meeting.attendanceStatus == '1' ? 'Active' : 'Inactive',
                     isStatus: true,
                     statusActive: meeting.attendanceStatus == '1',
                   ),
-                  
-                  // Action Buttons for ALL meetings (removed conditional check)
                   const SizedBox(height: 12),
                   Container(
                     height: 0.5,
@@ -712,7 +736,7 @@ class MeetingCard extends StatelessWidget {
                       Expanded(
                         child: _buildCompactActionButton(
                           context: context,
-                          label: 'PRESENT',
+                          label: 'PRESENTATION',
                           icon: Icons.present_to_all_outlined,
                           isPrimary: true,
                           onPressed: () {
@@ -1144,7 +1168,6 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
                               return _buildPresentationCard(presentations[index]);
                             },
                           ),
-            // Action Buttons for ALL meetings (removed conditional check)
             const SizedBox(height: 24),
             Row(
               children: [
@@ -1715,7 +1738,6 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
   }
 }
 
-// Model classes remain unchanged
 class Visitor {
   final String name;
   final String about;

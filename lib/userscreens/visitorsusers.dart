@@ -12,7 +12,8 @@ class VisitorManagementScreen extends StatefulWidget {
   State<VisitorManagementScreen> createState() => _VisitorManagementScreenState();
 }
 
-class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
+class _VisitorManagementScreenState extends State<VisitorManagementScreen>
+    with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> visitors = [];
   List<Map<String, dynamic>> meetings = [];
   bool isLoading = true;
@@ -25,6 +26,9 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
   String? groupCode;
   Set<String> validGroupIds = {}; // Store valid G_IDs from existing visitors
 
+  // Tab controller
+  late TabController _tabController;
+
   // Form controllers
   final TextEditingController nameController = TextEditingController();
   final TextEditingController aboutController = TextEditingController();
@@ -35,6 +39,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     debugPrint('=== VisitorManagementScreen: initState called ===');
     _loadUserData();
   }
@@ -484,7 +489,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
         debugPrint('SUCCESS: Visitor added successfully');
         
         _clearForm();
-        Navigator.of(context).pop();
+        _tabController.animateTo(1); // Switch to visitors list tab
         
         debugPrint('Refreshing visitors list...');
         await _fetchVisitors();
@@ -659,124 +664,6 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
         content: Text(message),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  void _showAddVisitorBottomSheet() {
-    debugPrint('=== Opening Add Visitor Bottom Sheet ===');
-    debugPrint('Available meetings: ${meetings.length}');
-    debugPrint('Current user data - ID: "$userId", Group: "$groupId"');
-    debugPrint('Valid G_IDs available: $validGroupIds');
-    
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Add New Visitor',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ), 
-                  if (validGroupIds.isNotEmpty) ...[
-                    const SizedBox(height: 4),  
-                  ],
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildTextField('Name', nameController),
-                            const SizedBox(height: 16),
-                            _buildTextField('About', aboutController),
-                            const SizedBox(height: 16),
-                            _buildTextField('Email', emailController, 
-                                keyboardType: TextInputType.emailAddress),
-                            const SizedBox(height: 16),
-                            _buildTextField('Phone', phoneController, 
-                                keyboardType: TextInputType.phone),
-                            const SizedBox(height: 16),
-                            _buildMeetingDropdown(),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              debugPrint('Cancel button pressed - closing bottom sheet');
-                              Navigator.of(context).pop();
-                            },
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              side: const BorderSide(color: Colors.grey),
-                            ),
-                            child: const Text('Cancel'),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              debugPrint('Add Visitor button pressed');
-                              _addVisitor();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            child: const Text(
-                              'Add Visitor',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -968,54 +855,48 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    debugPrint('=== Building VisitorManagementScreen ===');
-    debugPrint('Current state - isLoading: $isLoading, visitors count: ${visitors.length}');
-    
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          'Visitor Management',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.black,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: Platform.isIOS 
-          ? IconButton(
-              icon: const Icon(CupertinoIcons.back, color: Colors.white),
-              onPressed: () {
-                debugPrint('iOS back button pressed');
-                Navigator.of(context).pop();
-              },
-            )
-          : IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () {
-                debugPrint('Android back button pressed');
-                Navigator.of(context).pop();
-              },
-            ),
-      ),
-      body: Column(
+  Widget _buildAddVisitorTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Add Visitor Button Section
-          Container(
+          const Text(
+            'Add New Visitor',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildTextField('Name', nameController),
+          const SizedBox(height: 16),
+          _buildTextField('About', aboutController),
+          const SizedBox(height: 16),
+          _buildTextField('Email', emailController, 
+              keyboardType: TextInputType.emailAddress),
+          const SizedBox(height: 16),
+          _buildTextField('Phone', phoneController, 
+              keyboardType: TextInputType.phone),
+          const SizedBox(height: 16),
+          _buildMeetingDropdown(),
+          const SizedBox(height: 30),
+          SizedBox(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: ElevatedButton.icon(
+            child: ElevatedButton(
               onPressed: () {
-                debugPrint('Add Visitor button pressed from main screen');
-                _showAddVisitorBottomSheet();
+                debugPrint('Add Visitor button pressed');
+                _addVisitor();
               },
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
                 'Add Visitor',
                 style: TextStyle(
                   color: Colors.white,
@@ -1023,23 +904,147 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 2,
-              ),
             ),
           ),
-          // Main Content
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVisitorsTab() {
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.black),
+      );
+    }
+
+    if (visitors.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: () {
+        debugPrint('Pull-to-refresh triggered');
+        return _fetchData();
+      },
+      color: Colors.black,
+      child: Column(
+        children: [
           Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.black))
-                : visitors.isEmpty
-                    ? _buildEmptyState()
-                    : _buildVisitorList(),
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: visitors.length,
+              itemBuilder: (context, index) {
+                final visitor = visitors[index];
+                debugPrint('Building visitor card for index $index: ${visitor['Visitor_Name']}');
+                
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      debugPrint('Visitor card tapped: ${visitor['Visitor_Name']}');
+                      _showVisitorDetails(visitor);
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  visitor['Visitor_Name'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'ID: ${visitor['vis_inv_id'] ?? 'N/A'}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            visitor['About_Visitor'] ?? '',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Icon(Icons.email, size: 16, color: Colors.grey),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  visitor['Visitor_Email'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.phone, size: 16, color: Colors.grey),
+                              const SizedBox(width: 8),
+                              Text(
+                                visitor['Visitor_Phone'] ?? '',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (visitor['created_at'] != null) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Added: ${visitor['created_at']}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -1078,7 +1083,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Click the "Add Visitor" button to invite someone',
+              'Add visitors using the "Add Visitors" tab',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -1109,161 +1114,59 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
     );
   }
 
-  Widget _buildVisitorList() {
-    debugPrint('Building visitor list with ${visitors.length} visitors');
+  @override
+  Widget build(BuildContext context) {
+    debugPrint('=== Building VisitorManagementScreen ===');
+    debugPrint('Current state - isLoading: $isLoading, visitors count: ${visitors.length}');
     
-    return RefreshIndicator(
-      onRefresh: () {
-        debugPrint('Pull-to-refresh triggered');
-        return _fetchData();
-      },
-      color: Colors.black,
-      child: Column(
-        children: [
-          // Visitors count header
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.grey.shade100,
-            child: Text(
-              'My Visitors (${visitors.length})',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text(
+          'Visitor',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
-          // Visitors list
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: visitors.length,
-              itemBuilder: (context, index) {
-                final visitor = visitors[index];
-                debugPrint('Building visitor card for index $index: ${visitor['Visitor_Name']}');
-                
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: InkWell(
-                    onTap: () {
-                      debugPrint('Visitor card tapped: ${visitor['Visitor_Name']}');
-                      _showVisitorDetails(visitor);
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: const BoxDecoration(
-                            color: Colors.black,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(12),
-                              topRight: Radius.circular(12),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  visitor['Visitor_Name'] ?? '',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  'ID: ${visitor['vis_inv_id'] ?? 'N/A'}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                visitor['About_Visitor'] ?? '',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  const Icon(Icons.email, size: 20, color: Colors.grey),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      visitor['Visitor_Email'] ?? '',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Icon(Icons.phone, size: 20, color: Colors.grey),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    visitor['Visitor_Phone'] ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (visitor['created_at'] != null) ...[
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.access_time, size: 20, color: Colors.grey),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Added: ${visitor['created_at']}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
+        ),
+        backgroundColor: Colors.black,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        leading: Platform.isIOS 
+          ? IconButton(
+              icon: const Icon(CupertinoIcons.back, color: Colors.white),
+              onPressed: () {
+                debugPrint('iOS back button pressed');
+                Navigator.of(context).pop();
+              },
+            )
+          : IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () {
+                debugPrint('Android back button pressed');
+                Navigator.of(context).pop();
               },
             ),
-          ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          tabs: const [
+            Tab(
+              text: 'Add Visitors',
+            ),
+            Tab(
+              text: 'All Visitors',
+            ),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildAddVisitorTab(),
+          _buildVisitorsTab(),
         ],
       ),
     );
@@ -1272,6 +1175,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen> {
   @override
   void dispose() {
     debugPrint('=== VisitorManagementScreen: dispose called ===');
+    _tabController.dispose();
     nameController.dispose();
     aboutController.dispose();
     emailController.dispose();
