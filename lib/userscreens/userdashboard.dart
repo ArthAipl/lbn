@@ -7,7 +7,8 @@ import 'package:lbn/userscreens/eventsmembers.dart';
 import 'package:lbn/userscreens/meetingsuser.dart';
 import 'package:lbn/userscreens/memberprofile.dart';
 import 'package:lbn/userscreens/onetwooone.dart';
-import 'package:lbn/userscreens/refrenceuser.dart';
+import 'package:lbn/userscreens/refrencessuser.dart';
+
 import 'package:lbn/userscreens/usermembers.dart';
 import 'package:lbn/userscreens/visitorsusers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -254,7 +255,7 @@ class _UserDashboardState extends State<UserDashboard> {
             } else if (title == 'Profile') {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const UserProfile()),
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
               );
             }
           } else {
@@ -372,7 +373,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const BusinessPage()),
+                    MaterialPageRoute(builder: (context) => const BusinessDetailsPage()),
                   );
                 },
               ),
@@ -449,7 +450,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ReferencePage()),
+                    MaterialPageRoute(builder: (context) => ReferencesPage()),
                   );
                 },
               ),

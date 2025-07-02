@@ -1,86 +1,326 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-// Enhanced AppBar widget with gradient
-PreferredSizeWidget buildAppBar(String title, BuildContext context) {
-  return AppBar(
-    backgroundColor: Colors.transparent,
-    elevation: 0,
-    flexibleSpace: Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.black, Color(0xFF2C2C2C)],
-        ),
-      ),
-    ),
-    leading: IconButton(
-      icon: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 18),
-      ),
-      onPressed: () => Navigator.pop(context),
-    ),
-    title: Text(
-      title,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 22,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
-      ),
-    ),
-    centerTitle: true,
-  );
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({Key? key}) : super(key: key);
+
+  @override
+  _ProfilePageState createState() => _ProfilePageState();
 }
 
-// Editable Info Card widget
-Widget buildEditableInfoCard({
-  required String title,
-  required TextEditingController controller,
-  required IconData icon,
-  required String? Function(String?) validator,
-  bool readOnly = false,
-  bool enabled = true,
-}) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.white, Colors.grey.shade50],
-      ),
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.06),
-          blurRadius: 15,
-          offset: const Offset(0, 5),
+class _ProfilePageState extends State<ProfilePage> {
+  String? name;
+  String? email;
+  String? number;
+  String? userId;
+  String? groupId;
+  bool isLoading = true;
+  String? errorMessage;
+  final _formKey = GlobalKey<FormState>();
+
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
+  late TextEditingController _numberController;
+
+  Map<String, dynamic>? memberData;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+    _numberController = TextEditingController();
+    fetchUserData();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _numberController.dispose();
+    super.dispose();
+  }
+
+  Future<void> fetchUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final storedUserId = prefs.getString('user_id');
+      print('Retrieved user_id from SharedPreferences: $storedUserId');
+
+      if (storedUserId == null) {
+        setState(() {
+          errorMessage = 'User ID not found in SharedPreferences';
+          isLoading = false;
+        });
+        print('Error: User ID not found in SharedPreferences');
+        return;
+      }
+
+      print('Making API call to https://tagai.caxis.ca/public/api/member');
+      final response = await http.get(
+        Uri.parse('https://tagai.caxis.ca/public/api/member'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      print('API response status code: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        print('API response data: $responseData');
+
+        final List<dynamic> members = responseData['members'] ?? [];
+        final member = members.firstWhere(
+          (m) => m['M_ID'].toString() == storedUserId,
+          orElse: () => null,
+        );
+
+        if (member != null) {
+          print('Found matching member: $member');
+          setState(() {
+            userId = storedUserId;
+            name = member['Name'] ?? prefs.getString('user_name') ?? 'N/A';
+            email = member['email'] ?? prefs.getString('user_email') ?? 'N/A';
+            number = member['number'] ?? prefs.getString('user_phone') ?? 'N/A';
+            groupId = member['G_ID']?.toString() ?? prefs.getString('group_id');
+            _nameController.text = name!;
+            _emailController.text = email!;
+            _numberController.text = number!;
+            memberData = member;
+            isLoading = false;
+          });
+
+          if (groupId != null) {
+            await prefs.setString('group_id', groupId!);
+          }
+        } else {
+          print('No matching member found in API, using SharedPreferences data');
+          setState(() {
+            userId = storedUserId;
+            name = prefs.getString('user_name') ?? 'N/A';
+            email = prefs.getString('user_email') ?? 'N/A';
+            number = prefs.getString('user_phone') ?? 'N/A';
+            groupId = prefs.getString('group_id');
+            _nameController.text = name!;
+            _emailController.text = email!;
+            _numberController.text = number!;
+            errorMessage = 'User not found in API, showing stored data';
+            isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          userId = storedUserId;
+          errorMessage = 'Failed to fetch data from API: ${response.statusCode}';
+          name = prefs.getString('user_name') ?? 'N/A';
+          email = prefs.getString('user_email') ?? 'N/A';
+          number = prefs.getString('user_phone') ?? 'N/A';
+          groupId = prefs.getString('group_id');
+          _nameController.text = name!;
+          _emailController.text = email!;
+          _numberController.text = number!;
+          isLoading = false;
+        });
+        print('Error: Failed to fetch data from API, status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Error: $e';
+        isLoading = false;
+      });
+      print('Exception caught: $e');
+    }
+  }
+
+  Future<void> saveUserData() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final updatedData = {
+        'M_ID': userId,
+        'Name': _nameController.text,
+        'email': _emailController.text,
+        'number': _numberController.text,
+      };
+
+      print('Sending updated data to API: $updatedData');
+      final response = await http.put(
+        Uri.parse('https://tagai.caxis.ca/public/api/member/$userId'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(updatedData),
+      );
+
+      print('Save API response status code: ${response.statusCode}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await prefs.setString('user_name', _nameController.text);
+        await prefs.setString('user_email', _emailController.text);
+        await prefs.setString('user_phone', _numberController.text);
+
+        setState(() {
+          name = _nameController.text;
+          email = _emailController.text;
+          number = _numberController.text;
+          isLoading = false;
+          errorMessage = 'Profile updated successfully';
+        });
+        print('Profile updated successfully');
+      } else {
+        setState(() {
+          errorMessage = 'Failed to update profile: ${response.statusCode}';
+          isLoading = false;
+        });
+        print('Error: Failed to update profile, status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Error saving data: $e';
+        isLoading = false;
+      });
+      print('Exception caught while saving: $e');
+    }
+  }
+
+  Widget _buildCustomTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: const TextStyle(color: Colors.black, fontSize: 16),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: Colors.black54),
+          prefixIcon: Icon(icon, color: Colors.black54),
+          filled: true,
+          fillColor: Colors.grey[50],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Colors.black, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Colors.red, width: 1),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
-      ],
-    ),
-    child: Row(
+      ),
+    );
+  }
+
+  Widget _buildSaveButton({required VoidCallback onPressed, required String text}) {
+    return Container(
+      width: double.infinity,
+      height: 55,
+      margin: const EdgeInsets.symmetric(vertical: 20),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          elevation: 0,
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorMessage() {
+    if (errorMessage == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: errorMessage!.contains('successfully') 
+            ? Colors.green[50] 
+            : Colors.red[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: errorMessage!.contains('successfully') 
+              ? Colors.green 
+              : Colors.red,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            errorMessage!.contains('successfully') 
+                ? Icons.check_circle 
+                : Icons.error,
+            color: errorMessage!.contains('successfully') 
+                ? Colors.green 
+                : Colors.red,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              errorMessage!,
+              style: TextStyle(
+                color: errorMessage!.contains('successfully') 
+                    ? Colors.green[800] 
+                    : Colors.red[800],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          width: 60,
+          height: 60,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: enabled
-                  ? [Colors.black, const Color(0xFF2C2C2C)]
-                  : [Colors.grey.shade400, Colors.grey.shade500],
-            ),
-            borderRadius: BorderRadius.circular(8),
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(15),
           ),
-          child: Icon(icon, color: Colors.white, size: 18),
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 30,
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -89,743 +329,110 @@ Widget buildEditableInfoCard({
             children: [
               Text(
                 title,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
-              const SizedBox(height: 4),
-              TextFormField(
-                controller: controller,
-                readOnly: readOnly,
-                enabled: enabled,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: enabled ? Colors.black87 : Colors.grey.shade500,
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black54,
                 ),
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                  isDense: true,
-                  hintStyle: TextStyle(
-                    color: Colors.grey.shade400,
-                    fontSize: 15,
-                  ),
-                  hintText: 'Enter $title',
-                ),
-                validator: validator,
               ),
             ],
           ),
         ),
       ],
-    ),
-  );
-}
-
-// User Profile Screen with Inline Editing
-class UserProfile extends StatefulWidget {
-  const UserProfile({super.key});
-
-  @override
-  _UserProfileState createState() => _UserProfileState();
-}
-
-class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
-  String _userId = '';
-  String _authToken = '';
-  String _roleId = '';
-  late TextEditingController _nameController;
-  late TextEditingController _emailController;
-  late TextEditingController _phoneController;
-  late TextEditingController _groupCodeController;
-  String? _errorMessage;
-  bool _isLoading = false;
-  bool _hasChanges = false;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController();
-    _emailController = TextEditingController();
-    _phoneController = TextEditingController();
-    _groupCodeController = TextEditingController();
-
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-
-    _loadUserData();
-    _animationController.forward();
-
-    // Listen for changes
-    _nameController.addListener(_onFieldChanged);
-    _emailController.addListener(_onFieldChanged);
-    _phoneController.addListener(_onFieldChanged);
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _groupCodeController.dispose();
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _onFieldChanged() {
-    setState(() {
-      _hasChanges = true;
-    });
-  }
-
-  Future<void> _loadUserData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final keys = prefs.getKeys();
-      print('SharedPreferences keys: $keys');
-      print(
-          'SharedPreferences values: ${keys.map((key) => '$key: ${prefs.get(key)}').join(', ')}');
-
-      // Handle user_id which might be stored as int or string
-      var userIdRaw = prefs.get('user_id');
-      if (userIdRaw != null) {
-        _userId = userIdRaw.toString();
-      }
-
-      // Handle role_id which might be stored as int or string
-      var roleIdRaw = prefs.get('user_role') ?? prefs.get('role_id');
-      if (roleIdRaw != null) {
-        _roleId = roleIdRaw.toString();
-      } else {
-        _roleId = '3'; // Default to role 3 if not found
-      }
-
-      // Load user_name, default to empty string if null
-      String name = prefs.getString('user_name') ?? '';
-      print('Loaded user_name from SharedPreferences: "$name"');
-
-      setState(() {
-        _authToken = prefs.getString('auth_token') ?? prefs.getString('token') ?? '';
-        _nameController.text = name;
-        _emailController.text = prefs.getString('user_email') ?? '';
-        _phoneController.text = prefs.getString('user_phone') ?? '';
-        _groupCodeController.text = prefs.getString('group_code') ?? '';
-        _errorMessage = _userId.isEmpty
-            ? 'No profile data found. Please log in.'
-            : name.isEmpty
-                ? 'Please enter your name below and save.'
-                : null;
-        _hasChanges = false;
-      });
-
-      if (_userId.isEmpty) {
-        print('Error: user_id is missing in SharedPreferences');
-      } else {
-        print('user_id loaded: $_userId');
-        print('role_id loaded: $_roleId');
-        print('auth_token loaded: ${_authToken.isNotEmpty ? "Yes" : "No"}');
-        print('name loaded: $name');
-        print('Profile data loaded successfully');
-      }
-    } catch (e) {
-      print('Error loading SharedPreferences: $e');
-      setState(() {
-        _errorMessage = 'Failed to load profile: $e';
-      });
-    }
-  }
-
-  void _redirectToLogin() {
-    print('Redirecting to login screen');
-    Navigator.pushReplacementNamed(context, '/login');
-  }
-
-  Future<void> _saveUserData() async {
-    if (!_formKey.currentState!.validate()) {
-      print('Form validation failed');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Save to SharedPreferences first
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_id', _userId);
-      String name = _nameController.text.trim();
-      await prefs.setString('user_name', name);
-      await prefs.setString('user_email', _emailController.text.trim());
-      await prefs.setString('user_phone', _phoneController.text.trim());
-      await prefs.setString('group_code', _groupCodeController.text.trim());
-      print('Saved user_name to SharedPreferences: "$name"');
-
-      // Prepare headers with authentication if available
-      Map<String, String> headers = {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Accept': 'application/json',
-      };
-
-      if (_authToken.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $_authToken';
-      }
-
-      print('Request headers: $headers');
-      print('User ID: $_userId, Role ID: $_roleId');
-
-      // Try different API approaches - focusing on UPDATE operations
-      List<Map<String, dynamic>> apiAttempts = [
-        {
-          'method': 'PUT',
-          'url': 'https://tagai.caxis.ca/public/api/users/$_userId',
-          'body': {
-            'name': name,
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'group_code': _groupCodeController.text.trim(),
-          },
-        },
-        {
-          'method': 'PATCH',
-          'url': 'https://tagai.caxis.ca/public/api/users/$_userId',
-          'body': {
-            'name': name,
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'group_code': _groupCodeController.text.trim(),
-          },
-        },
-        {
-          'method': 'POST',
-          'url': 'https://tagai.caxis.ca/public/api/users/update',
-          'body': {
-            'user_id': _userId,
-            'name': name,
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'group_code': _groupCodeController.text.trim(),
-          },
-        },
-        {
-          'method': 'PUT',
-          'url': 'https://tagai.caxis.ca/public/api/profile',
-          'body': {
-            'user_id': _userId,
-            'name': name,
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'group_code': _groupCodeController.text.trim(),
-          },
-        },
-        {
-          'method': 'POST',
-          'url': 'https://tagai.caxis.ca/public/api/profile/update',
-          'body': {
-            'user_id': _userId,
-            'name': name,
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'group_code': _groupCodeController.text.trim(),
-          },
-        },
-        {
-          'method': 'PUT',
-          'url': 'https://tagai.caxis.ca/public/api/member/$_userId',
-          'body': {
-            'user_id': _userId,
-            'role_id': 3,
-            'name': name,
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'group_code': _groupCodeController.text.trim(),
-            'action': 'update',
-          },
-        },
-        {
-          'method': 'POST',
-          'url': 'https://tagai.caxis.ca/public/api/member/update',
-          'body': {
-            'user_id': _userId,
-            'role_id': 3,
-            'name': name,
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'group_code': _groupCodeController.text.trim(),
-            'is_update': true,
-          },
-        },
-        {
-          'method': 'POST',
-          'url': 'https://tagai.caxis.ca/public/api/update-member',
-          'body': {
-            'id': _userId,
-            'user_id': _userId,
-            'role_id': 3,
-            'name': name,
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'group_code': _groupCodeController.text.trim(),
-          },
-        },
-        {
-          'method': 'POST',
-          'url': 'https://tagai.caxis.ca/public/api/member',
-          'body': {
-            'user_id': _userId,
-            'role_id': 3,
-            'name': name,
-            'email': _emailController.text.trim(),
-            'phone': _phoneController.text.trim(),
-            'group_code': _groupCodeController.text.trim(),
-            'method': 'PUT',
-            '_method': 'PUT',
-            'update': 1,
-          },
-        },
-      ];
-
-      http.Response? successResponse;
-      String successEndpoint = '';
-      String successMethod = '';
-
-      for (var attempt in apiAttempts) {
-        try {
-          print('\n=== Trying ${attempt['method']} ${attempt['url']} ===');
-          print('Body: ${jsonEncode(attempt['body'])}');
-
-          http.Response response;
-
-          switch (attempt['method']) {
-            case 'PUT':
-              response = await http.put(
-                Uri.parse(attempt['url']),
-                headers: headers,
-                body: jsonEncode(attempt['body']),
-              );
-              break;
-            case 'PATCH':
-              response = await http.patch(
-                Uri.parse(attempt['url']),
-                headers: headers,
-                body: jsonEncode(attempt['body']),
-              );
-              break;
-            default:
-              response = await http.post(
-                Uri.parse(attempt['url']),
-                headers: headers,
-                body: jsonEncode(attempt['body']),
-              );
-          }
-
-          print('Response Status: ${response.statusCode}');
-          print('Response Body: ${response.body}');
-
-          if (response.statusCode == 200 || response.statusCode == 201) {
-            try {
-              final responseData = jsonDecode(response.body);
-              if (responseData is Map) {
-                bool isSuccess = responseData['success'] == true ||
-                    responseData['status'] == true ||
-                    responseData['status'] == 'success' ||
-                    responseData.containsKey('data') ||
-                    responseData.containsKey('user') ||
-                    responseData.containsKey('member');
-
-                if (isSuccess || responseData['status'] != false) {
-                  successResponse = response;
-                  successEndpoint = attempt['url'];
-                  successMethod = attempt['method'];
-                  print('✅ SUCCESS with ${attempt['method']} ${attempt['url']}');
-                  break;
-                }
-              }
-            } catch (e) {
-              successResponse = response;
-              successEndpoint = attempt['url'];
-              successMethod = attempt['method'];
-              print('✅ SUCCESS (non-JSON response) with ${attempt['method']} ${attempt['url']}');
-              break;
-            }
-          } else if (response.statusCode == 404) {
-            print('❌ Endpoint not found: ${attempt['url']}');
-          } else if (response.statusCode == 403) {
-            print('❌ Access forbidden (403): ${response.body}');
-          } else if (response.statusCode == 422) {
-            try {
-              final errorData = jsonDecode(response.body);
-              print('❌ Validation Error: ${errorData}');
-            } catch (e) {
-              print('❌ Validation Error (unparseable): ${response.body}');
-            }
-          } else {
-            print('❌ Failed with status ${response.statusCode}: ${response.body}');
-          }
-        } catch (e) {
-          print('❌ Network error for ${attempt['method']} ${attempt['url']}: $e');
-          continue;
-        }
-      }
-
-      if (successResponse != null) {
-        setState(() {
-          _hasChanges = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Profile updated successfully!\nUsed: $successMethod $successEndpoint'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 4),
-          ),
-        );
-
-        print('🎉 Profile updated successfully using: $successMethod $successEndpoint');
-      } else {
-        setState(() {
-          _errorMessage =
-              'Unable to update profile on server.\n\nThis might be because:\n• The API requires special permissions\n• Your account role doesn\'t allow updates\n• The server endpoints have changed\n\nYour changes are saved locally.';
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('⚠️ Saved locally - Server update failed'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
-          ),
-        );
-
-        print('❌ All API attempts failed. The server requires specific permissions or endpoints have changed.');
-      }
-    } catch (e) {
-      print('💥 Critical error in _saveUserData: $e');
-      setState(() {
-        _errorMessage = 'Network error: $e';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: buildAppBar('Profile', context),
-      body: _errorMessage != null && _userId.isEmpty
-          ? Center(
-              child: Container(
-                margin: const EdgeInsets.all(20),
-                padding: const EdgeInsets.all(30),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      child: Icon(
-                        Icons.error_outline,
-                        color: Colors.red.shade400,
-                        size: 40,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Profile Not Found',
-                      style: TextStyle(
-                        color: Colors.grey.shade800,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _errorMessage!,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 30),
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Colors.black, Color(0xFF2C2C2C)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ElevatedButton(
-                        onPressed: _redirectToLogin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Go to Login',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(CupertinoIcons.back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
               ),
             )
-          : FadeTransition(
-              opacity: _fadeAnimation,
-              child: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _formKey,
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: double.infinity,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.black, Color(0xFF2C2C2C)],
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 20),
-                            Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.white.withOpacity(0.3),
-                                    Colors.white.withOpacity(0.1)
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(50),
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(47),
-                                ),
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 50,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _nameController.text.isEmpty ? 'No Name' : _nameController.text,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                _emailController.text.isEmpty ? 'No Email' : _emailController.text,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                          ],
-                        ),
+                      const SizedBox(height: 20),
+                      _buildSectionHeader(
+                        icon: Icons.person,
+                        title: 'Personal Information',
+                        subtitle: 'Manage your personal details',
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (_errorMessage != null && _userId.isNotEmpty)
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                margin: const EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade50,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.orange.shade200),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(Icons.info_outline,
-                                        color: Colors.orange.shade600, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _errorMessage!,
-                                        style: TextStyle(
-                                          color: Colors.orange.shade700,
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            const Text(
-                              'Edit Your Information',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black87,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            buildEditableInfoCard(
-                              title: 'Full Name',
-                              controller: _nameController,
-                              icon: Icons.person_outline,
-                              validator: (value) =>
-                                  value!.trim().isEmpty ? 'Please enter your name' : null,
-                            ),
-                            buildEditableInfoCard(
-                              title: 'Email Address',
-                              controller: _emailController,
-                              icon: Icons.email_outlined,
-                              validator: (value) {
-                                if (value!.trim().isEmpty) return 'Please enter your email';
-                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                    .hasMatch(value.trim())) {
-                                  return 'Please enter a valid email';
-                                }
-                                return null;
-                              },
-                            ),
-                            buildEditableInfoCard(
-                              title: 'Phone Number',
-                              controller: _phoneController,
-                              icon: Icons.phone_outlined,
-                              validator: (value) =>
-                                  value!.trim().isEmpty ? 'Please enter your phone number' : null,
-                            ),
-                            const SizedBox(height: 24),
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              height: _hasChanges ? 50 : 0,
-                              child: _hasChanges
-                                  ? Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [Colors.black, Color(0xFF2C2C2C)],
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: const [
-                                          BoxShadow(
-                                            color: Colors.black87,
-                                            blurRadius: 15,
-                                            offset: Offset(0, 8),
-                                          ),
-                                        ],
-                                      ),
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.transparent,
-                                          shadowColor: Colors.transparent,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        onPressed: _isLoading ? null : _saveUserData,
-                                        child: _isLoading
-                                            ? const SizedBox(
-                                                height: 20,
-                                                width: 20,
-                                                child: CircularProgressIndicator(
-                                                  valueColor:
-                                                      AlwaysStoppedAnimation<Color>(Colors.white),
-                                                  strokeWidth: 2,
-                                                ),
-                                              )
-                                            : Row(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: const [
-                                                  Icon(
-                                                    Icons.save_outlined,
-                                                    color: Colors.white,
-                                                    size: 18,
-                                                  ),
-                                                  SizedBox(width: 8),
-                                                  Text(
-                                                    'Save Changes',
-                                                    style: TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.white,
-                                                      letterSpacing: 0.5,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                      ),
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
-                          ],
-                        ),
+                      const SizedBox(height: 32),
+                      _buildErrorMessage(),
+                      _buildCustomTextField(
+                        controller: _nameController,
+                        label: 'Full Name',
+                        icon: Icons.person_outline,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a name';
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildCustomTextField(
+                        controller: _emailController,
+                        label: 'Email Address',
+                        icon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter an email';
+                          }
+                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                              .hasMatch(value)) {
+                            return 'Please enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildCustomTextField(
+                        controller: _numberController,
+                        label: 'Phone Number',
+                        icon: Icons.phone_outlined,
+                        keyboardType: TextInputType.phone,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a phone number';
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildSaveButton(
+                        onPressed: saveUserData,
+                        text: 'Save Profile',
                       ),
                     ],
                   ),

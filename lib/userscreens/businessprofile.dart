@@ -1,547 +1,508 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-class BusinessPage extends StatefulWidget {
-  const BusinessPage({super.key});
+class BusinessDetailsPage extends StatefulWidget {
+  const BusinessDetailsPage({Key? key}) : super(key: key);
 
   @override
-  State<BusinessPage> createState() => _BusinessPageState();
+  _BusinessDetailsPageState createState() => _BusinessDetailsPageState();
 }
 
-class _BusinessPageState extends State<BusinessPage> {
-  bool _isLoading = true;
-  bool _isEditing = false;
-  Map<String, dynamic> _businessData = {};
+class _BusinessDetailsPageState extends State<BusinessDetailsPage> {
+  String? userId;
+  String? groupId;
+  String? memBusiId;
+  bool isLoading = true;
+  String? errorMessage;
+  final _businessFormKey = GlobalKey<FormState>();
 
-  // Controllers for editing
-  final _businessNameController = TextEditingController();
-  final _descController = TextEditingController();
-  final _servicesController = TextEditingController();
-  final _productsController = TextEditingController();
-  final _weburlController = TextEditingController();
-  final _fblinkController = TextEditingController();
-  final _instalinkController = TextEditingController();
-  final _tellinkController = TextEditingController();
-  final _lilinkController = TextEditingController();
+  late TextEditingController _businessNameController;
+
+  List<dynamic> businessCategories = [];
+  String? selectedCategoryId;
+  String? businessName;
 
   @override
   void initState() {
     super.initState();
-    _debugSharedPreferences();
-    _fetchBusinessProfile();
-  }
-
-  Future<void> _debugSharedPreferences() async {
-    final prefs = await SharedPreferences.getInstance();
-    debugPrint('SharedPreferences - mem_busi_id: ${prefs.getString('mem_busi_id')}');
-    debugPrint('SharedPreferences - G_ID: ${prefs.getInt('G_ID')}');
-    debugPrint('SharedPreferences - M_ID: ${prefs.getInt('M_ID')}');
+    _businessNameController = TextEditingController();
+    initializeData();
   }
 
   @override
   void dispose() {
     _businessNameController.dispose();
-    _descController.dispose();
-    _servicesController.dispose();
-    _productsController.dispose();
-    _weburlController.dispose();
-    _fblinkController.dispose();
-    _instalinkController.dispose();
-    _tellinkController.dispose();
-    _lilinkController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchBusinessProfile() async {
+  Future<void> initializeData() async {
+    await fetchUserBasicData();
+    await fetchBusinessCategories();
+    await fetchBusinessData();
+  }
+
+  Future<void> fetchUserBasicData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final gId = prefs.getInt('G_ID') ?? 2;
-      final mId = prefs.getInt('M_ID') ?? 1;
+      final storedUserId = prefs.getString('user_id');
+      final storedGroupId = prefs.getString('group_id');
+      
+      setState(() {
+        userId = storedUserId;
+        groupId = storedGroupId;
+      });
+      
+      print('Retrieved user_id: $userId, group_id: $groupId');
+    } catch (e) {
+      print('Error fetching user basic data: $e');
+    }
+  }
 
+  Future<void> fetchBusinessCategories() async {
+    try {
+      print('Making API call to https://tagai.caxis.ca/public/api/busi-cates');
       final response = await http.get(
-        Uri.parse('https://tagai.caxis.ca/public/api/busi-profiles?G_ID=$gId&M_ID=$mId'),
+        Uri.parse('https://tagai.caxis.ca/public/api/busi-cates'),
         headers: {'Content-Type': 'application/json'},
       );
 
+      print('Business Categories API response status code: ${response.statusCode}');
       if (response.statusCode == 200) {
-        final responseBody = response.body;
-        debugPrint('GET API Response: $responseBody');
-        final data = json.decode(responseBody);
-        if (data['mem_busi_id'] != null) {
-          await prefs.setString('mem_busi_id', data['mem_busi_id'].toString());
-          debugPrint('Stored mem_busi_id from API: ${data['mem_busi_id']}');
-        } else {
-          debugPrint('Warning: mem_busi_id not found in API response');
-        }
+        final List<dynamic> responseData = jsonDecode(response.body);
+        print('Business Categories API response data: $responseData');
+
         setState(() {
-          _businessData = data;
-          _populateControllers();
-          _isLoading = false;
+          businessCategories = responseData;
+          if (businessCategories.isNotEmpty && selectedCategoryId == null) {
+            selectedCategoryId = businessCategories[0]['B_Cat_Id'].toString();
+          }
         });
       } else {
-        throw Exception('Failed to load business profile: ${response.statusCode}');
+        setState(() {
+          errorMessage = 'Failed to fetch business categories: ${response.statusCode}';
+        });
+        print('Error: Failed to fetch business categories, status code: ${response.statusCode}');
       }
     } catch (e) {
       setState(() {
-        _isLoading = false;
+        errorMessage = 'Error fetching business categories: $e';
+        isLoading = false;
       });
-      _showErrorSnackBar('Error fetching business profile: $e');
-      debugPrint('Fetch error: $e');
+      print('Exception caught while fetching business categories: $e');
     }
   }
 
-  void _populateControllers() {
-    _businessNameController.text = _businessData['business_name'] ?? '';
-    _descController.text = _businessData['busi_desc'] ?? '';
-    _servicesController.text = _businessData['services'] ?? '';
-    _productsController.text = _businessData['products'] ?? '';
-    _weburlController.text = _businessData['weburl'] ?? '';
-    _fblinkController.text = _businessData['fblink'] ?? '';
-    _instalinkController.text = _businessData['instalink'] ?? '';
-    _tellinkController.text = _businessData['tellink'] ?? '';
-    _lilinkController.text = _businessData['lilink'] ?? '';
-  }
-
-  Future<void> _updateBusinessProfile() async {
+  Future<void> fetchBusinessData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final gId = prefs.getInt('G_ID') ?? 2;
-      final mId = prefs.getInt('M_ID') ?? 1;
-      final memBusiId = prefs.getString('mem_busi_id');
-
-      if (memBusiId == null) {
-        _showErrorSnackBar('Member business ID is missing. Please set it first.');
-        debugPrint('Error: mem_busi_id is null');
+      if (userId == null) {
+        setState(() {
+          errorMessage = 'User ID not available for fetching business data';
+          isLoading = false;
+        });
+        print('Error: User ID not available for fetching business data');
         return;
       }
 
-      debugPrint('Sending mem_busi_id: $memBusiId');
-
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('https://tagai.caxis.ca/public/api/busi-profiles'),
+      print('Making API call to https://tagai.caxis.ca/public/api/memb-busi');
+      final response = await http.get(
+        Uri.parse('https://tagai.caxis.ca/public/api/memb-busi'),
+        headers: {'Content-Type': 'application/json'},
       );
 
-      // Add form fields
-      request.fields.addAll({
-        'business_name': _businessNameController.text,
-        'busi_desc': _descController.text,
-        'services': _servicesController.text,
-        'products': _productsController.text,
-        'weburl': _weburlController.text,
-        'fblink': _fblinkController.text,
-        'instalink': _instalinkController.text,
-        'tellink': _tellinkController.text,
-        'lilink': _lilinkController.text,
-        'mem_busi_id': memBusiId,
-        'G_ID': gId.toString(),
-        'M_ID': mId.toString(),
-      });
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      debugPrint('POST API Response: $responseBody');
-
+      print('Business API response status code: ${response.statusCode}');
       if (response.statusCode == 200) {
-        setState(() {
-          _isEditing = false;
-        });
-        _showSuccessSnackBar('Business profile updated successfully!');
-        await _fetchBusinessProfile();
+        final List<dynamic> responseData = jsonDecode(response.body);
+        print('Business API response data: $responseData');
+
+        final business = responseData.firstWhere(
+          (b) => b['M_ID'].toString() == userId,
+          orElse: () => null,
+        );
+
+        if (business != null) {
+          print('Found matching business: $business');
+          setState(() {
+            memBusiId = business['mem_busi_id']?.toString();
+            businessName = business['Business_Name'] ?? 'N/A';
+            selectedCategoryId = business['B_Cat_Id']?.toString();
+            _businessNameController.text = businessName!;
+            isLoading = false;
+          });
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('business_name', businessName!);
+          if (memBusiId != null) {
+            await prefs.setString('mem_busi_id', memBusiId!);
+          }
+          if (selectedCategoryId != null) {
+            await prefs.setString('business_category_id', selectedCategoryId!);
+          }
+        } else {
+          print('No matching business found for M_ID: $userId');
+          setState(() {
+            businessName = 'N/A';
+            _businessNameController.text = businessName!;
+            isLoading = false;
+          });
+        }
       } else {
-        final errorData = json.decode(responseBody);
-        final errorMessage = errorData['error'] ?? 'Unknown error';
-        throw Exception('Failed to update business profile: ${response.statusCode} - $errorMessage');
+        setState(() {
+          errorMessage = 'Failed to fetch business data: ${response.statusCode}';
+          isLoading = false;
+        });
+        print('Error: Failed to fetch business data, status code: ${response.statusCode}');
       }
     } catch (e) {
-      _showErrorSnackBar('Error updating business profile: $e');
-      debugPrint('Update error: $e');
+      setState(() {
+        errorMessage = 'Error fetching business data: $e';
+        isLoading = false;
+      });
+      print('Exception caught while fetching business data: $e');
     }
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 5),
+  Future<void> saveBusinessData() async {
+    if (!_businessFormKey.currentState!.validate()) {
+      return;
+    }
+
+    if (groupId == null) {
+      setState(() {
+        errorMessage = 'Group ID is not available. Please try again later.';
+        isLoading = false;
+      });
+      print('Error: Group ID is null');
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final businessData = {
+        'mem_busi_id': memBusiId ?? userId,
+        'Business_Name': _businessNameController.text,
+        'B_Cat_Id': selectedCategoryId,
+        'G_ID': groupId,
+        'M_ID': userId,
+      };
+
+      print('Sending business data to API: $businessData');
+
+      // Use PUT request for updating business data
+      final response = await http.put(
+        Uri.parse('https://tagai.caxis.ca/public/api/memb-busi/${memBusiId ?? userId}'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(businessData),
+      );
+
+      print('Business Save API response status code: ${response.statusCode}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await prefs.setString('business_name', _businessNameController.text);
+        await prefs.setString('business_category_id', selectedCategoryId!);
+
+        if (memBusiId == null) {
+          final responseData = jsonDecode(response.body);
+          memBusiId = responseData['mem_busi_id']?.toString();
+          if (memBusiId != null) {
+            await prefs.setString('mem_busi_id', memBusiId!);
+          }
+        }
+
+        setState(() {
+          businessName = _businessNameController.text;
+          isLoading = false;
+          errorMessage = 'Business details updated successfully';
+        });
+        print('Business details updated successfully');
+      } else {
+        setState(() {
+          errorMessage = 'Failed to update business details: ${response.statusCode}';
+          isLoading = false;
+        });
+        print('Error: Failed to update business details, status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Error saving business data: $e';
+        isLoading = false;
+      });
+      print('Exception caught while saving business data: $e');
+    }
+  }
+
+  Widget _buildCustomTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: const TextStyle(color: Colors.black, fontSize: 16),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: Colors.black54),
+          prefixIcon: Icon(icon, color: Colors.black54),
+          filled: true,
+          fillColor: Colors.grey[50],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Colors.black, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Colors.red, width: 1),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
       ),
     );
   }
 
-  void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
+  Widget _buildCustomDropdown() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: DropdownButtonFormField<String>(
+        value: selectedCategoryId,
+        style: const TextStyle(color: Colors.black, fontSize: 16),
+        decoration: InputDecoration(
+          labelText: 'Business Category',
+          labelStyle: const TextStyle(color: Colors.black54),
+          prefixIcon: const Icon(Icons.business, color: Colors.black54),
+          filled: true,
+          fillColor: Colors.grey[50],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Colors.black, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+        items: businessCategories.map((category) {
+          return DropdownMenuItem<String>(
+            value: category['B_Cat_Id'].toString(),
+            child: Text(category['Category_Name'] ?? 'N/A'),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            selectedCategoryId = value;
+          });
+        },
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please select a business category';
+          }
+          return null;
+        },
       ),
+    );
+  }
+
+  Widget _buildSaveButton({required VoidCallback onPressed, required String text}) {
+    return Container(
+      width: double.infinity,
+      height: 55,
+      margin: const EdgeInsets.symmetric(vertical: 20),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          elevation: 0,
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorMessage() {
+    if (errorMessage == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: errorMessage!.contains('successfully') 
+            ? Colors.green[50] 
+            : Colors.red[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: errorMessage!.contains('successfully') 
+              ? Colors.green 
+              : Colors.red,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            errorMessage!.contains('successfully') 
+                ? Icons.check_circle 
+                : Icons.error,
+            color: errorMessage!.contains('successfully') 
+                ? Colors.green 
+                : Colors.red,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              errorMessage!,
+              style: TextStyle(
+                color: errorMessage!.contains('successfully') 
+                    ? Colors.green[800] 
+                    : Colors.red[800],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 30,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black54,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          icon: const Icon(CupertinoIcons.back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Business Profile',
+          'Business Details',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        actions: [
-          FutureBuilder<String?>(
-            future: SharedPreferences.getInstance()
-                .then((prefs) => prefs.getString('mem_busi_id')),
-            builder: (context, snapshot) {
-              if (!_isLoading && snapshot.hasData && snapshot.data != null) {
-                return IconButton(
-                  icon: Icon(
-                    _isEditing ? Icons.save : Icons.edit,
-                    color: Colors.white,
-                  ),
-                  onPressed: () {
-                    if (_isEditing) {
-                      _updateBusinessProfile();
-                    } else {
-                      setState(() {
-                        _isEditing = true;
-                      });
-                    }
-                  },
-                );
-              }
-              return const SizedBox.shrink(); // Hide button if mem_busi_id is null
-            },
-          ),
-          if (_isEditing)
-            IconButton(
-              icon: const Icon(Icons.cancel, color: Colors.white),
-              onPressed: () {
-                setState(() {
-                  _isEditing = false;
-                  _populateControllers();
-                });
-              },
-            ),
-        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+              ),
+            )
           : SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Colors.black, Colors.grey],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Your Business',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _businessData['business_name'] ?? 'Business Name',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    if (_isEditing) ...[
-                      _buildEditCard(
-                        title: 'Business Name',
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _businessFormKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      _buildSectionHeader(
                         icon: Icons.business,
-                        child: TextFormField(
-                          controller: _businessNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Business Name',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
+                        title: 'Business Information',
+                        subtitle: 'Manage your business details',
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 32),
+                      _buildErrorMessage(),
+                      _buildCustomTextField(
+                        controller: _businessNameController,
+                        label: 'Business Name',
+                        icon: Icons.store_outlined,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a business name';
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildCustomDropdown(),
+                      _buildSaveButton(
+                        onPressed: saveBusinessData,
+                        text: 'Save Business Details',
+                      ),
                     ],
-                    _buildInfoCard(
-                      title: 'Business Description',
-                      icon: Icons.description,
-                      children: [
-                        _isEditing
-                            ? TextFormField(
-                                controller: _descController,
-                                maxLines: 3,
-                                decoration: const InputDecoration(
-                                  hintText: 'Enter business description',
-                                  border: OutlineInputBorder(),
-                                ),
-                              )
-                            : Text(
-                                _businessData['busi_desc'] ?? 'No description available',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[800],
-                                ),
-                              ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInfoCard(
-                      title: 'Services & Products',
-                      icon: Icons.business_center,
-                      children: [
-                        if (_isEditing) ...[
-                          TextFormField(
-                            controller: _servicesController,
-                            decoration: const InputDecoration(
-                              labelText: 'Services',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _productsController,
-                            decoration: const InputDecoration(
-                              labelText: 'Products',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ] else ...[
-                          _buildInfoRow('Services', _businessData['services'] ?? 'Not specified'),
-                          _buildInfoRow('Products', _businessData['products'] ?? 'Not specified'),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInfoCard(
-                      title: 'Contact Information',
-                      icon: Icons
-
-.contact_mail,
-                      children: [
-                        if (_isEditing) ...[
-                          TextFormField(
-                            controller: _weburlController,
-                            decoration: const InputDecoration(
-                              labelText: 'Website URL',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ] else ...[
-                          _buildInfoRow('Website', _businessData['weburl'] ?? 'Not provided'),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInfoCard(
-                      title: 'Social Media Links',
-                      icon: Icons.share,
-                      children: [
-                        if (_isEditing) ...[
-                          TextFormField(
-                            controller: _fblinkController,
-                            decoration: const InputDecoration(
-                              labelText: 'Facebook',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _instalinkController,
-                            decoration: const InputDecoration(
-                              labelText: 'Instagram',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _tellinkController,
-                            decoration: const InputDecoration(
-                              labelText: 'Telegram',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _lilinkController,
-                            decoration: const InputDecoration(
-                              labelText: 'LinkedIn',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ] else ...[
-                          _buildInfoRow('Facebook', _businessData['fblink'] ?? 'Not provided'),
-                          _buildInfoRow('Instagram', _businessData['instalink'] ?? 'Not provided'),
-                          _buildInfoRow('Telegram', _businessData['tellink'] ?? 'Not provided'),
-                          _buildInfoRow('LinkedIn', _businessData['lilink'] ?? 'Not provided'),
-                        ],
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-    );
-  }
-
-  Widget _buildInfoCard({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  icon,
-                  size: 24,
-                  color: Colors.red,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEditCard({
-    required String title,
-    required IconData icon,
-    required Widget child,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  icon,
-                  size: 24,
-                  color: Colors.red,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontSize: 16,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.right,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
