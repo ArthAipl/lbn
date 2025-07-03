@@ -164,7 +164,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
   final _locationController = TextEditingController();
   final _dateController = TextEditingController();
   final _timeController = TextEditingController();
-  int? _selectedSlot;
+  final _slotController = TextEditingController();
   String? _selectedSchedule;
   final List<Map<String, String>> schedules = [
     {'id': 'weekly', 'name': 'weekly'},
@@ -216,7 +216,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
             colorScheme: ColorScheme.light(
               primary: Colors.black,
               onPrimary: Colors.white,
-              surface: Colors.white,
+        surface: Colors.white,
               onSurface: Colors.black,
             ),
           ),
@@ -257,7 +257,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
         'Place': _placeController.text,
         'G_Location': _locationController.text,
         'Meet_Cate': 'General',
-        'slot': _selectedSlot?.toString(),
+        'slot': _slotController.text,
         'schedule': scheduleToSend,
         'Attn_Status': '1',
       };
@@ -293,8 +293,8 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
             _locationController.clear();
             _dateController.clear();
             _timeController.clear();
+            _slotController.clear();
             setState(() {
-              _selectedSlot = null;
               _selectedSchedule = null;
             });
 
@@ -346,6 +346,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
     _locationController.dispose();
     _dateController.dispose();
     _timeController.dispose();
+    _slotController.dispose();
     super.dispose();
   }
 
@@ -447,7 +448,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
             const SizedBox(height: 20),
             // Time Field
             _buildInputField(
-              label: 'Meeting Time',
+              label: 'Meeting Time!',
               controller: _timeController,
               icon: Icons.access_time,
               hint: 'Select meeting time',
@@ -549,62 +550,23 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
               ],
             ),
             const SizedBox(height: 20),
-            // Presentation Slots Radio Buttons
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Presentation Slots',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<int>(
-                        value: 1,
-                        groupValue: _selectedSlot,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedSlot = value;
-                          });
-                        },
-                        title: const Text(
-                          '1',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        dense: true,
-                        activeColor: Colors.black,
-                      ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<int>(
-                        value: 2,
-                        groupValue: _selectedSlot,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedSlot = value;
-                          });
-                        },
-                        title: const Text(
-                          '2',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        dense: true,
-                        activeColor: Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-                if (_selectedSlot == null)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 16, top: 4),
-                  ),
-              ],
+            // Presentation Slots Text Field
+            _buildInputField(
+              label: 'Presentation Slots',
+              controller: _slotController,
+              icon: Icons.format_list_numbered,
+              hint: 'Enter number of slots',
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter the number of slots';
+                }
+                final slotValue = int.tryParse(value);
+                if (slotValue == null || slotValue <= 0) {
+                  return 'Please enter a valid number of slots';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 32),
             // Create Button
