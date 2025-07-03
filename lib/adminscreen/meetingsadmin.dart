@@ -163,7 +163,14 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
   final _placeController = TextEditingController();
   final _locationController = TextEditingController();
   final _dateController = TextEditingController();
-  final _slotController = TextEditingController();
+  final _timeController = TextEditingController();
+  int? _selectedSlot;
+  String? _selectedSchedule;
+  final List<Map<String, String>> schedules = [
+    {'id': 'weekly', 'name': 'weekly'},
+    {'id': 'fortnight', 'name': 'fortnight'},
+    {'id': 'monthly', 'name': 'monthly'},
+  ];
   bool isLoading = false;
 
   @override
@@ -199,22 +206,63 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
     }
   }
 
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.black,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        final now = DateTime.now();
+        final formattedTime = DateFormat('HH:mm').format(
+          DateTime(now.year, now.month, now.day, picked.hour, picked.minute),
+        );
+        _timeController.text = formattedTime;
+      });
+    }
+  }
+
   Future<void> _createMeeting() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         isLoading = true;
       });
 
+      // Debug: Log the selected schedule before creating the meeting
+      debugPrint('Selected Schedule before submission: $_selectedSchedule');
+
+      // Fallback: Set default schedule if _selectedSchedule is null (should not happen due to validation)
+      final scheduleToSend = _selectedSchedule ?? 'weekly';
+      debugPrint('Schedule to send to API: $scheduleToSend');
+
       final meetingData = {
         'G_ID': widget.gId,
-        'M_ID': null, // Changed to null as requested
+        'M_ID': null,
         'Meeting_Date': _dateController.text,
+        'Meeting_Time': _timeController.text,
         'Place': _placeController.text,
         'G_Location': _locationController.text,
         'Meet_Cate': 'General',
-        'slot': _slotController.text,
+        'slot': _selectedSlot?.toString(),
+        'schedule': scheduleToSend,
         'Attn_Status': '1',
       };
+
+      debugPrint('Meeting Data Payload: ${jsonEncode(meetingData)}');
 
       try {
         final response = await http.post(
@@ -239,17 +287,35 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
                 ),
               ),
             );
-            
+
             // Clear form
             _placeController.clear();
             _locationController.clear();
             _dateController.clear();
-            _slotController.clear();
-            
+            _timeController.clear();
+            setState(() {
+              _selectedSlot = null;
+              _selectedSchedule = null;
+            });
+
             widget.onMeetingCreated();
           }
         } else {
-          throw Exception('Failed to create meeting. Status code: ${response.statusCode}');
+          // Parse error response for detailed message
+          String errorMessage = 'Failed to create meeting. Status code: ${response.statusCode}';
+          try {
+            final errorData = jsonDecode(response.body);
+            if (errorData['message'] != null) {
+              errorMessage = errorData['message'];
+              if (errorData['errors'] != null) {
+                errorMessage += '\nDetails: ${jsonEncode(errorData['errors'])}';
+              }
+            }
+          } catch (e) {
+            debugPrint('Error parsing API response: $e');
+          }
+
+          throw Exception(errorMessage);
         }
       } catch (e) {
         debugPrint('Error creating meeting: $e');
@@ -269,6 +335,8 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
           );
         }
       }
+    } else {
+      debugPrint('Form validation failed');
     }
   }
 
@@ -277,7 +345,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
     _placeController.dispose();
     _locationController.dispose();
     _dateController.dispose();
-    _slotController.dispose();
+    _timeController.dispose();
     super.dispose();
   }
 
@@ -377,22 +445,166 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
               },
             ),
             const SizedBox(height: 20),
-            // Presentation Slots Field
+            // Time Field
             _buildInputField(
-              label: 'Presentation Slots',
-              controller: _slotController,
-              icon: Icons.present_to_all,
-              hint: 'Enter number of presentation slots',
-              keyboardType: TextInputType.number,
+              label: 'Meeting Time',
+              controller: _timeController,
+              icon: Icons.access_time,
+              hint: 'Select meeting time',
+              readOnly: true,
+              onTap: () => _selectTime(context),
+              suffixIcon: Icons.arrow_drop_down,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter the number of presentation slots';
-                }
-                if (int.tryParse(value) == null || int.parse(value) <= 0) {
-                  return 'Please enter a valid number of slots';
+                  return 'Please select a time';
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: 20),
+            // Schedule Dropdown
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Schedule',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedSchedule,
+                      hint: Text(
+                        'Select schedule',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                      ),
+                      items: schedules.map<DropdownMenuItem<String>>((schedule) {
+                        return DropdownMenuItem<String>(
+                          value: schedule['id'],
+                          child: Text(
+                            schedule['name']!,
+                            style: const TextStyle(fontSize: 14, color: Colors.black),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSchedule = value;
+                          debugPrint('Dropdown selection changed to: $_selectedSchedule');
+                        });
+                      },
+                      decoration: InputDecoration(
+                        prefixIcon: Icon(Icons.schedule, color: Colors.black, size: 20),
+                        suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 20),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.black, width: 2),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red, width: 2),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.red, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select a schedule';
+                        }
+                        return null;
+                      },
+                      isExpanded: true,
+                      icon: const SizedBox.shrink(), // Hide the default dropdown arrow
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Presentation Slots Radio Buttons
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Presentation Slots',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<int>(
+                        value: 1,
+                        groupValue: _selectedSlot,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedSlot = value;
+                          });
+                        },
+                        title: const Text(
+                          '1',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        dense: true,
+                        activeColor: Colors.black,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<int>(
+                        value: 2,
+                        groupValue: _selectedSlot,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedSlot = value;
+                          });
+                        },
+                        title: const Text(
+                          '2',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        dense: true,
+                        activeColor: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_selectedSlot == null)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 16, top: 4),
+                  ),
+              ],
             ),
             const SizedBox(height: 32),
             // Create Button
@@ -896,9 +1108,7 @@ class _VisitorsPageState extends State<VisitorsPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          visitors = data.where((visitor) => 
-            visitor['M_C_Id'].toString() == widget.meetingId
-          ).toList();
+          visitors = data.where((visitor) => visitor['M_C_Id'].toString() == widget.meetingId).toList();
           isLoading = false;
         });
         debugPrint('Visitors fetched successfully: ${visitors.length} found for meeting ${widget.meetingId}');
@@ -1006,7 +1216,7 @@ class _VisitorsPageState extends State<VisitorsPage> {
                   itemCount: visitors.length,
                   itemBuilder: (context, index) {
                     final visitor = visitors[index];
-                    
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: Card(
@@ -1060,7 +1270,6 @@ class _VisitorsPageState extends State<VisitorsPage> {
                                 ),
                               ),
                               const SizedBox(width: 16),
-                              
                               // Visitor Info
                               Expanded(
                                 child: Column(
@@ -1121,7 +1330,6 @@ class _VisitorsPageState extends State<VisitorsPage> {
                                   ],
                                 ),
                               ),
-                              
                               // Status Badge
                               Container(
                                 padding: const EdgeInsets.symmetric(
