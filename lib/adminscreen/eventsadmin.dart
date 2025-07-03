@@ -59,14 +59,16 @@ class EventsAdminPage extends StatefulWidget {
 class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProviderStateMixin {
   List<dynamic> events = [];
   bool isLoading = true;
-  String? gropCode;
+  String? groupCode;
   String? gId;
   
   // Create Event Form Controllers
   final _formKey = GlobalKey<FormState>();
   final _eventNameController = TextEditingController();
+  final _eventDescriptionController = TextEditingController();
   final _eventDateController = TextEditingController();
-  final _eventModeController = TextEditingController();
+  final _eventTimeController = TextEditingController();
+  String? _eventMode;
   final _placeController = TextEditingController();
   String? _selectedFeesCatId;
   List<dynamic> _feesCategories = [];
@@ -87,18 +89,19 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
   void dispose() {
     _tabController.dispose();
     _eventNameController.dispose();
+    _eventDescriptionController.dispose();
     _eventDateController.dispose();
-    _eventModeController.dispose();
+    _eventTimeController.dispose();
     _placeController.dispose();
     super.dispose();
   }
 
   Future<void> fetchEvents() async {
     final prefs = await SharedPreferences.getInstance();
-    gropCode = prefs.getString('Grop_code');
+    groupCode = prefs.getString('group_code');
     gId = prefs.getString('user_id');
 
-    print('Retrieved Grop_code: $gropCode');
+    print('Retrieved group_code: $groupCode');
     print('Retrieved G_ID: $gId');
 
     if (gId == null || gId!.isEmpty) {
@@ -113,7 +116,7 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
       return;
     }
 
-    bool useGropCode = gropCode != null && gropCode!.isNotEmpty;
+    bool useGroupCode = groupCode != null && groupCode!.isNotEmpty;
 
     try {
       final response = await http.get(
@@ -128,10 +131,10 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
           events = data
               .where((event) {
                 bool matchesGId = event['G_ID'].toString() == gId;
-                bool matchesGropCode = useGropCode
-                    ? event['group_master']['Grop_code']?.toString() == gropCode
+                bool matchesGroupCode = useGroupCode
+                    ? event['group_master']['Grop_code']?.toString() == groupCode
                     : true;
-                return matchesGId && matchesGropCode;
+                return matchesGId && matchesGroupCode;
               })
               .toList();
           isLoading = false;
@@ -220,23 +223,58 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
     }
   }
 
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.black,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        final formattedTime = DateFormat('HH:mm').format(
+          DateTime(2025, 1, 1, picked.hour, picked.minute),
+        );
+        _eventTimeController.text = formattedTime; // e.g., "19:15"
+      });
+    }
+  }
+
   Future<void> createEvent() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_eventMode == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an event mode')),
+      );
+      return;
+    }
 
     setState(() {
       isCreating = true;
     });
 
     final prefs = await SharedPreferences.getInstance();
+    final groupCode = prefs.getString('group_code');
     final gId = prefs.getString('user_id');
-    final gropCode = prefs.getString('Grop_code');
 
-    print('Creating event with G_ID: $gId, Grop_code: $gropCode');
+    print('Creating event with G_ID: $gId, group_code: $groupCode');
 
-    if (gId == null || gId.isEmpty) {
-      print('Error: Missing user_id in SharedPreferences');
+    if (groupCode == null || groupCode.isEmpty) {
+      print('Error: Missing group_code in SharedPreferences');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User ID not found')),
+        const SnackBar(content: Text('Group Code not found')),
       );
       setState(() {
         isCreating = false;
@@ -246,12 +284,15 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
 
     final payload = {
       'Event_Name': _eventNameController.text,
+      'Event_Desc': _eventDescriptionController.text,
       'Event_Date': _eventDateController.text,
-      'Event_Mode': _eventModeController.text,
+      'Event_Time': _eventTimeController.text,
+      'Event_Mode': _eventMode,
       'Place': _placeController.text,
       'fees_cat_id': _selectedFeesCatId,
       'G_ID': gId,
       'M_ID': null,
+      // 'Grop_code': groupCode, // Uncomment if API requires Grop_code
     };
 
     print('Create event payload: $payload');
@@ -268,11 +309,13 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
         
         // Clear form
         _eventNameController.clear();
+        _eventDescriptionController.clear();
         _eventDateController.clear();
-        _eventModeController.clear();
+        _eventTimeController.clear();
         _placeController.clear();
         setState(() {
           _selectedFeesCatId = null;
+          _eventMode = null;
         });
         
         // Switch to events tab and refresh
@@ -284,8 +327,15 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
         );
       } else {
         print('Failed to create event: Status code ${response.statusCode}, Response: ${response.body}');
+        String errorMessage = 'Failed to create event';
+        try {
+          final errorData = jsonDecode(response.body);
+          errorMessage = errorData['message'] ?? errorMessage;
+        } catch (_) {
+          errorMessage = 'Server error (HTTP ${response.statusCode})';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create event')),
+          SnackBar(content: Text(errorMessage)),
         );
       }
     } catch (e) {
@@ -326,14 +376,8 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
           unselectedLabelColor: Colors.grey[400],
           labelStyle: const TextStyle(fontWeight: FontWeight.w600),
           tabs: const [
-            Tab(
-             
-              text: 'Create Event',
-            ),
-            Tab(
-              
-              text: 'All Events',
-            ),
+            Tab(text: 'Create Event'),
+            Tab(text: 'All Events'),
           ],
         ),
       ),
@@ -408,6 +452,18 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
+                          controller: _eventDescriptionController,
+                          decoration: const InputDecoration(
+                            labelText: 'Event Description',
+                            prefixIcon: Icon(Icons.description, color: Colors.black),
+                            hintText: 'Enter event description',
+                          ),
+                          maxLines: 3,
+                          validator: (value) =>
+                              value!.isEmpty ? 'Enter event description' : null,
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
                           controller: _eventDateController,
                           decoration: const InputDecoration(
                             labelText: 'Event Date',
@@ -422,14 +478,69 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
-                          controller: _eventModeController,
+                          controller: _eventTimeController,
                           decoration: const InputDecoration(
-                            labelText: 'Event Mode',
-                            prefixIcon: Icon(Icons.settings, color: Colors.black),
-                            hintText: 'Enter event mode',
+                            labelText: 'Event Time',
+                            prefixIcon: Icon(Icons.access_time, color: Colors.black),
+                            suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.black),
+                            hintText: 'Select event time',
                           ),
+                          readOnly: true,
+                          onTap: () => _selectTime(context),
                           validator: (value) =>
-                              value!.isEmpty ? 'Enter event mode' : null,
+                              value!.isEmpty ? 'Select event time' : null,
+                        ),
+                        const SizedBox(height: 20),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Event Mode',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: RadioListTile<String>(
+                                    title: const Text('Compulsory'),
+                                    value: 'Compulsory',
+                                    groupValue: _eventMode,
+                                    activeColor: Colors.black,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _eventMode = value;
+                                      });
+                                    },
+                                  ),
+                                ),
+                                Expanded(
+                                  child: RadioListTile<String>(
+                                    title: const Text('Optional'),
+                                    value: 'Optional',
+                                    groupValue: _eventMode,
+                                    activeColor: Colors.black,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _eventMode = value;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_eventMode == null)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 16.0, top: 8.0),
+                                child: Text(
+                                  'Select an event mode',
+                                  style: TextStyle(color: Colors.red, fontSize: 12),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 20),
                         TextFormField(
@@ -443,30 +554,30 @@ class _EventsAdminPageState extends State<EventsAdminPage> with SingleTickerProv
                               value!.isEmpty ? 'Enter place' : null,
                         ),
                         const SizedBox(height: 20),
-DropdownButtonFormField<String>(
-  value: _selectedFeesCatId,
-  decoration: const InputDecoration(
-    labelText: 'Fees Category',
-    prefixIcon: Icon(Icons.currency_rupee, color: Colors.black),
-    hintText: 'Select fees category',
-  ),
-  items: _feesCategories.map<DropdownMenuItem<String>>((category) {
-    return DropdownMenuItem<String>(
-      value: category['fees_cat_id'].toString(),
-      child: Text(
-        '${category['Desc'] ?? 'Unknown'} - ₹${category['Amount'] ?? '0'}',
-        style: const TextStyle(fontSize: 14),
-      ),
-    );
-  }).toList(),
-  onChanged: (value) {
-    setState(() {
-      _selectedFeesCatId = value;
-    });
-  },
-  validator: (value) =>
-      value == null ? 'Select a fees category' : null,
-),
+                        DropdownButtonFormField<String>(
+                          value: _selectedFeesCatId,
+                          decoration: const InputDecoration(
+                            labelText: 'Fees Category',
+                            prefixIcon: Icon(Icons.currency_rupee, color: Colors.black),
+                            hintText: 'Select fees category',
+                          ),
+                          items: _feesCategories.map<DropdownMenuItem<String>>((category) {
+                            return DropdownMenuItem<String>(
+                              value: category['fees_cat_id'].toString(),
+                              child: Text(
+                                '${category['Desc'] ?? 'Unknown'} - ₹${category['Amount'] ?? '0'}',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedFeesCatId = value;
+                            });
+                          },
+                          validator: (value) =>
+                              value == null ? 'Select a fees category' : null,
+                        ),
                         const SizedBox(height: 32),
                         SizedBox(
                           width: double.infinity,
@@ -577,7 +688,6 @@ DropdownButtonFormField<String>(
                       ),
                       child: Column(
                         children: [
-                          // Header with black background
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(20.0),
@@ -616,15 +726,28 @@ DropdownButtonFormField<String>(
                               ],
                             ),
                           ),
-                          // Content with white background
                           Padding(
                             padding: const EdgeInsets.all(20.0),
                             child: Column(
                               children: [
                                 _buildEventDetailRow(
+                                  Icons.description,
+                                  'Description',
+                                  event['Event_Desc'] ?? 'N/A',
+                                  Colors.black,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildEventDetailRow(
                                   Icons.calendar_today,
                                   'Date',
                                   event['Event_Date'] ?? 'N/A',
+                                  Colors.black,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildEventDetailRow(
+                                  Icons.access_time,
+                                  'Time',
+                                  event['Event_Time'] ?? 'N/A',
                                   Colors.black,
                                 ),
                                 const SizedBox(height: 16),

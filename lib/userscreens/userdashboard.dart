@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lbn/adminscreen/meetingsadmin.dart';
 import 'package:lbn/screens/loginscreen.dart';
+import 'package:lbn/screens/settingslbn.dart';
 import 'package:lbn/userscreens/businessprofile.dart';
 import 'package:lbn/userscreens/circlemeetinguser.dart';
 import 'package:lbn/userscreens/eventsmembers.dart';
@@ -8,7 +9,6 @@ import 'package:lbn/userscreens/meetingsuser.dart';
 import 'package:lbn/userscreens/memberprofile.dart';
 import 'package:lbn/userscreens/onetwooone.dart';
 import 'package:lbn/userscreens/refrencessuser.dart';
-
 import 'package:lbn/userscreens/usermembers.dart';
 import 'package:lbn/userscreens/visitorsusers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -63,59 +63,6 @@ class _UserDashboardState extends State<UserDashboard> {
         color: Colors.white,
         child: Column(
           children: [
-            Container(
-              height: 220,
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.black, Color(0xFF2C2C2C)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white24, width: 2),
-                      ),
-                      child: const CircleAvatar(
-                        radius: 32,
-                        backgroundColor: Colors.white12,
-                        child: Icon(
-                          Icons.person_outline,
-                          size: 36,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'John Doe',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Text(
-                      'CEO, TechVentures',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
@@ -128,39 +75,10 @@ class _UserDashboardState extends State<UserDashboard> {
                     isNavigationItem: true,
                   ),
                   _buildDrawerItem(
-                    icon: Icons.dashboard_outlined,
-                    title: 'Dashboard',
-                    index: 1,
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.people_outline,
-                    title: 'Members',
-                    index: 2,
-                    isNavigationItem: true,
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.meeting_room_outlined,
-                    title: 'Meetings',
-                    index: 3,
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.event_outlined,
-                    title: 'Events',
-                    index: 4,
-                  ),
-                  _buildDrawerItem(
-                    icon: Icons.person_add_outlined,
-                    title: 'One-to-One',
-                    index: 5,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Divider(color: Colors.grey[300]),
-                  ),
-                  _buildDrawerItem(
                     icon: Icons.settings_outlined,
                     title: 'Settings',
                     index: 6,
+                    isNavigationItem: true, // Updated to treat Settings as a navigation item
                   ),
                   _buildDrawerItem(
                     icon: Icons.logout_outlined,
@@ -247,15 +165,15 @@ class _UserDashboardState extends State<UserDashboard> {
             }
           } else if (isNavigationItem) {
             Navigator.pop(context);
-            if (title == 'Members') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MemberListPage()),
-              );
-            } else if (title == 'Profile') {
+            if (title == 'Profile') {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            } else if (title == 'Settings') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsLbn()),
               );
             }
           } else {
@@ -270,22 +188,7 @@ class _UserDashboardState extends State<UserDashboard> {
   }
 
   Widget _buildBody() {
-    switch (_selectedIndex) {
-      case 0:
-        return _buildDashboard();
-      case 1:
-        return _buildDashboard();
-      case 2:
-        return _buildMembersPage();
-      case 3:
-        return _buildMeetingsPage();
-      case 4:
-        return _buildEventsPage();
-      case 5:
-        return _buildOneToOnePage();
-      default:
-        return _buildDashboard();
-    }
+    return _buildDashboard();
   }
 
   Widget _buildDashboard() {
@@ -338,9 +241,7 @@ class _UserDashboardState extends State<UserDashboard> {
                   ],
                 ),
               ),
-              
               const SizedBox(height: 24),
-              
               // Section Title
               const Text(
                 'Quick Actions',
@@ -354,8 +255,7 @@ class _UserDashboardState extends State<UserDashboard> {
             ]),
           ),
         ),
-        
-        // Feature Grid - First Row
+        // Feature Grid
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           sliver: SliverGrid(
@@ -457,59 +357,11 @@ class _UserDashboardState extends State<UserDashboard> {
             ]),
           ),
         ),
-        
         // Bottom padding
         const SliverPadding(
           padding: EdgeInsets.only(bottom: 20),
         ),
       ],
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 22,
-            color: Colors.grey[600],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -572,134 +424,6 @@ class _UserDashboardState extends State<UserDashboard> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildMembersPage() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.people_outline,
-            size: 80,
-            color: Colors.black54,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Members',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Manage your network members',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMeetingsPage() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.meeting_room_outlined,
-            size: 80,
-            color: Colors.black54,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Meetings',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Schedule and manage meetings',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEventsPage() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.event_outlined,
-            size: 80,
-            color: Colors.black54,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Events',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Create and join networking events',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOneToOnePage() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.person_add_outlined,
-            size: 80,
-            color: Colors.black54,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'One-to-One',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Connect with members personally',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-        ],
       ),
     );
   }

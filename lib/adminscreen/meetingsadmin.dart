@@ -164,7 +164,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
   final _locationController = TextEditingController();
   final _dateController = TextEditingController();
   final _timeController = TextEditingController();
-  final _slotController = TextEditingController();
+  int? _selectedSlot;
   String? _selectedSchedule;
   final List<Map<String, String>> schedules = [
     {'id': 'weekly', 'name': 'weekly'},
@@ -216,7 +216,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
             colorScheme: ColorScheme.light(
               primary: Colors.black,
               onPrimary: Colors.white,
-        surface: Colors.white,
+              surface: Colors.white,
               onSurface: Colors.black,
             ),
           ),
@@ -257,7 +257,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
         'Place': _placeController.text,
         'G_Location': _locationController.text,
         'Meet_Cate': 'General',
-        'slot': _slotController.text,
+        'slot': _selectedSlot?.toString(),
         'schedule': scheduleToSend,
         'Attn_Status': '1',
       };
@@ -293,8 +293,8 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
             _locationController.clear();
             _dateController.clear();
             _timeController.clear();
-            _slotController.clear();
             setState(() {
+              _selectedSlot = null;
               _selectedSchedule = null;
             });
 
@@ -346,7 +346,6 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
     _locationController.dispose();
     _dateController.dispose();
     _timeController.dispose();
-    _slotController.dispose();
     super.dispose();
   }
 
@@ -380,18 +379,9 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Create New Meeting',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
                   const SizedBox(height: 6),
                   Text(
-                    'Fill in the details below to schedule a new meeting',
+                    'Fill details below to schedule a new meeting',
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey[300],
@@ -448,7 +438,7 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
             const SizedBox(height: 20),
             // Time Field
             _buildInputField(
-              label: 'Meeting Time!',
+              label: 'Meeting Time',
               controller: _timeController,
               icon: Icons.access_time,
               hint: 'Select meeting time',
@@ -487,88 +477,124 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
                       ),
                     ],
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedSchedule,
-                      hint: Text(
-                        'Select schedule',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                      ),
-                      items: schedules.map<DropdownMenuItem<String>>((schedule) {
-                        return DropdownMenuItem<String>(
-                          value: schedule['id'],
-                          child: Text(
-                            schedule['name']!,
-                            style: const TextStyle(fontSize: 14, color: Colors.black),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedSchedule = value;
-                          debugPrint('Dropdown selection changed to: $_selectedSchedule');
-                        });
-                      },
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.schedule, color: Colors.black, size: 20),
-                        suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 20),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.black, width: 2),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.red, width: 2),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.red, width: 2),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please select a schedule';
-                        }
-                        return null;
-                      },
-                      isExpanded: true,
-                      icon: const SizedBox.shrink(), // Hide the default dropdown arrow
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedSchedule,
+                    hint: Text(
+                      'Select schedule',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                     ),
+                    items: schedules.map<DropdownMenuItem<String>>((schedule) {
+                      return DropdownMenuItem<String>(
+                        value: schedule['id'],
+                        child: Text(
+                          schedule['name']!,
+                          style: const TextStyle(fontSize: 14, color: Colors.black),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedSchedule = value;
+                        debugPrint('Dropdown selection changed to: $_selectedSchedule');
+                      });
+                    },
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.schedule, color: Colors.black, size: 20),
+                      suffixIcon: Icon(Icons.arrow_drop_down, color: Colors.grey[600], size: 20),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.black, width: 2),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please select a schedule';
+                      }
+                      return null;
+                    },
+                    isExpanded: true,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
-            // Presentation Slots Text Field
-            _buildInputField(
-              label: 'Presentation Slots',
-              controller: _slotController,
-              icon: Icons.format_list_numbered,
-              hint: 'Enter number of slots',
-              keyboardType: TextInputType.number,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter the number of slots';
-                }
-                final slotValue = int.tryParse(value);
-                if (slotValue == null || slotValue <= 0) {
-                  return 'Please enter a valid number of slots';
-                }
-                return null;
-              },
+            // Presentation Slots Radio Buttons
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Presentation Slots',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<int>(
+                        value: 1,
+                        groupValue: _selectedSlot,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedSlot = value;
+                          });
+                        },
+                        title: const Text(
+                          '1',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        dense: true,
+                        activeColor: Colors.black,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<int>(
+                        value: 2,
+                        groupValue: _selectedSlot,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedSlot = value;
+                          });
+                        },
+                        title: const Text(
+                          '2',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        dense: true,
+                        activeColor: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_selectedSlot == null)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 16, top: 4),
+                  ),
+              ],
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 5),
             // Create Button
             Container(
               width: double.infinity,
@@ -1053,12 +1079,55 @@ class VisitorsPage extends StatefulWidget {
 
 class _VisitorsPageState extends State<VisitorsPage> {
   List<dynamic> visitors = [];
-  bool isLoading = true;
+  List<dynamic> presentations = [];
+  Map<String, dynamic>? meetingDetails;
+  bool isLoadingMeeting = true;
+  bool isLoadingVisitors = true;
+  bool isLoadingPresentations = true;
 
   @override
   void initState() {
     super.initState();
+    _fetchMeetingDetails();
     _fetchVisitors();
+    _fetchPresentations();
+  }
+
+  Future<void> _fetchMeetingDetails() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://tagai.caxis.ca/public/api/meeting-cals'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          meetingDetails = data.firstWhere(
+            (meeting) => meeting['M_C_Id'].toString() == widget.meetingId,
+            orElse: () => null,
+          );
+          isLoadingMeeting = false;
+        });
+        debugPrint('Meeting details fetched successfully for meeting ${widget.meetingId}');
+      } else {
+        throw Exception('Failed to load meeting details. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error fetching meeting details: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading meeting details: $e'),
+          backgroundColor: Colors.red[600],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      setState(() {
+        isLoadingMeeting = false;
+      });
+    }
   }
 
   Future<void> _fetchVisitors() async {
@@ -1071,7 +1140,7 @@ class _VisitorsPageState extends State<VisitorsPage> {
         final data = jsonDecode(response.body);
         setState(() {
           visitors = data.where((visitor) => visitor['M_C_Id'].toString() == widget.meetingId).toList();
-          isLoading = false;
+          isLoadingVisitors = false;
         });
         debugPrint('Visitors fetched successfully: ${visitors.length} found for meeting ${widget.meetingId}');
       } else {
@@ -1079,9 +1148,6 @@ class _VisitorsPageState extends State<VisitorsPage> {
       }
     } catch (e) {
       debugPrint('Error fetching visitors: $e');
-      setState(() {
-        isLoading = false;
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading visitors: $e'),
@@ -1092,8 +1158,47 @@ class _VisitorsPageState extends State<VisitorsPage> {
           ),
         ),
       );
+      setState(() {
+        isLoadingVisitors = false;
+      });
     }
   }
+
+  Future<void> _fetchPresentations() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://tagai.caxis.ca/public/api/pres-tracks'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          presentations = data.where((presentation) => presentation['M_C_Id'].toString() == widget.meetingId).toList();
+          isLoadingPresentations = false;
+        });
+        debugPrint('Presentations fetched successfully: ${presentations.length} found for meeting ${widget.meetingId}');
+      } else {
+        throw Exception('Failed to load presentations. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error fetching presentations: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading presentations: $e'),
+          backgroundColor: Colors.red[600],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      setState(() {
+        isLoadingPresentations = false;
+      });
+    }
+  }
+
+  bool get isLoading => isLoadingMeeting || isLoadingVisitors || isLoadingPresentations;
 
   @override
   Widget build(BuildContext context) {
@@ -1107,26 +1212,13 @@ class _VisitorsPageState extends State<VisitorsPage> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Visitors',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              widget.meetingTitle,
-              style: TextStyle(
-                color: Colors.grey[300],
-                fontSize: 12,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-          ],
+        title: const Text(
+          'Details',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       ),
       body: isLoading
@@ -1135,215 +1227,486 @@ class _VisitorsPageState extends State<VisitorsPage> {
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
               ),
             )
-          : visitors.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          shape: BoxShape.circle,
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Meeting Details Section
+                  if (meetingDetails != null)
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: LinearGradient(
+                          colors: [Colors.white, Colors.grey[50]!],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        child: Icon(
-                          Icons.people_outline,
-                          size: 50,
-                          color: Colors.grey[400],
-                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'No visitors found',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            meetingDetails!['Place'] ?? 'Unknown Place',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                meetingDetails!['Meeting_Date'] != null
+                                    ? DateFormat('MMM dd, yyyy').format(
+                                        DateTime.parse(meetingDetails!['Meeting_Date']),
+                                      )
+                                    : 'N/A',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.access_time,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                meetingDetails!['Meeting_Time'] ?? 'N/A',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  meetingDetails!['G_Location'] ?? 'Location not specified',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.grey[100],
+                      ),
+                      child: Text(
+                        'Meeting details not found',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           color: Colors.grey[600],
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'No visitors have been invited to this meeting yet',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
+                    ),
+                  const SizedBox(height: 24),
+                  // Visitors Header
+                  const Text(
+                    'Visitors',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: visitors.length,
-                  itemBuilder: (context, index) {
-                    final visitor = visitors[index];
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Card(
-                        elevation: 4,
-                        shadowColor: Colors.black.withOpacity(0.1),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: LinearGradient(
-                              colors: [Colors.white, Colors.grey[50]!],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: Row(
+                  const SizedBox(height: 12),
+                  // Visitors List
+                  visitors.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Avatar
                               Container(
-                                width: 50,
-                                height: 50,
+                                width: 100,
+                                height: 100,
                                 decoration: BoxDecoration(
+                                  color: Colors.grey[100],
                                   shape: BoxShape.circle,
-                                  gradient: LinearGradient(
-                                    colors: [Colors.black87, Colors.black],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.15),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    (visitor['Visitor_Name']?.toString().isNotEmpty == true)
-                                        ? visitor['Visitor_Name'][0].toUpperCase()
-                                        : 'V',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                child: Icon(
+                                  Icons.people_outline,
+                                  size: 50,
+                                  color: Colors.grey[400],
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              // Visitor Info
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      visitor['Visitor_Name'] ?? 'Unknown Visitor',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                              const SizedBox(height: 20),
+                              Text(
+                                'No visitors found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'No visitors have been invited to this meeting yet',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: visitors.length,
+                          itemBuilder: (context, index) {
+                            final visitor = visitors[index];
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: Card(
+                                elevation: 4,
+                                shadowColor: Colors.black.withOpacity(0.1),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    gradient: LinearGradient(
+                                      colors: [Colors.white, Colors.grey[50]!],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
                                     ),
-                                    const SizedBox(height: 6),
-                                    if (visitor['Visitor_Email'] != null)
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.email,
-                                            size: 14,
-                                            color: Colors.grey[600],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      // Avatar
+                                      Container(
+                                        width: 50,
+                                        height: 50,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: LinearGradient(
+                                            colors: [Colors.black87, Colors.black],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
                                           ),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              visitor['Visitor_Email'],
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.15),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            (visitor['Visitor_Name']?.toString().isNotEmpty == true)
+                                                ? visitor['Visitor_Name'][0].toUpperCase()
+                                                : 'V',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      // Visitor Info
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              visitor['Visitor_Name'] ?? 'Unknown Visitor',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black87,
                                               ),
                                               overflow: TextOverflow.ellipsis,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(height: 6),
+                                            if (visitor['Visitor_Email'] != null)
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.email,
+                                                    size: 14,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    child: Text(
+                                                      visitor['Visitor_Email'],
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            if (visitor['Visitor_Phone'] != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 3),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.phone,
+                                                      size: 14,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      visitor['Visitor_Phone'],
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                       ),
-                                    if (visitor['Visitor_Phone'] != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 3),
+                                      // Status Badge
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: visitor['Status'] == 'confirmed'
+                                              ? Colors.green[50]
+                                              : Colors.orange[50],
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: visitor['Status'] == 'confirmed'
+                                                ? Colors.green[200]!
+                                                : Colors.orange[200]!,
+                                            width: 1,
+                                          ),
+                                        ),
                                         child: Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(
-                                              Icons.phone,
-                                              size: 14,
-                                              color: Colors.grey[600],
+                                            Container(
+                                              width: 6,
+                                              height: 6,
+                                              decoration: BoxDecoration(
+                                                color: visitor['Status'] == 'confirmed'
+                                                    ? Colors.green[600]
+                                                    : Colors.orange[600],
+                                                shape: BoxShape.circle,
+                                              ),
                                             ),
                                             const SizedBox(width: 4),
                                             Text(
-                                              visitor['Visitor_Phone'],
+                                              visitor['Status'] ?? 'Pending',
                                               style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: visitor['Status'] == 'confirmed'
+                                                    ? Colors.green[700]
+                                                    : Colors.orange[700],
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                  ],
-                                ),
-                              ),
-                              // Status Badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: visitor['Status'] == 'confirmed'
-                                      ? Colors.green[50]
-                                      : Colors.orange[50],
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: visitor['Status'] == 'confirmed'
-                                        ? Colors.green[200]!
-                                        : Colors.orange[200]!,
-                                    width: 1,
+                                    ],
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: BoxDecoration(
-                                        color: visitor['Status'] == 'confirmed'
-                                            ? Colors.green[600]
-                                            : Colors.orange[600],
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      visitor['Status'] ?? 'Pending',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: visitor['Status'] == 'confirmed'
-                                            ? Colors.green[700]
-                                            : Colors.orange[700],
-                                      ),
-                                    ),
-                                  ],
+                              ),
+                            );
+                          },
+                        ),
+                  const SizedBox(height: 24),
+                  // Presentations Header
+                  const Text(
+                    'Presentations',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Presentations List
+                  presentations.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.slideshow,
+                                  size: 50,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                'No presentations found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'No presentations have been scheduled for this meeting',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
                                 ),
                               ),
                             ],
                           ),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: presentations.length,
+                          itemBuilder: (context, index) {
+                            final presentation = presentations[index];
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: Card(
+                                elevation: 4,
+                                shadowColor: Colors.black.withOpacity(0.1),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    gradient: LinearGradient(
+                                      colors: [Colors.white, Colors.grey[50]!],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        presentation['Pres_Name'] ?? 'Unknown Presentation',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      if (presentation['Pres_Desc'] != null)
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.description,
+                                              size: 14,
+                                              color: Colors.grey[600],
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                presentation['Pres_Desc'],
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      if (presentation['Pres_Time'] != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 3),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.access_time,
+                                                size: 14,
+                                                color: Colors.grey[600],
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                presentation['Pres_Time'],
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      ),
-                    );
-                  },
-                ),
+                ],
+              ),
+            ),
     );
   }
 }
