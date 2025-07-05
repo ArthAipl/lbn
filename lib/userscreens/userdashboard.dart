@@ -300,7 +300,7 @@ class _UserDashboardState extends State<UserDashboard> {
                     Text(
                       'Welcome back!',
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                       ),
