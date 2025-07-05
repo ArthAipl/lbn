@@ -9,7 +9,6 @@ import 'package:lbn/adminscreen/adminprofilepage.dart';
 import 'package:lbn/screens/loginscreen.dart';
 import 'package:flutter/services.dart';
 
-
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
@@ -22,18 +21,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String userEmail = '';
   String groupCode = '';
   bool isLoading = true;
-  int _selectedIndex = 0;
-  bool _isDrawerOpen = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Sample data for charts
-  final List<double> weeklyActivity = [5, 12, 8, 15, 7, 10, 13];
-  final List<double> memberGrowth = [120, 132, 145, 160, 178, 195, 210];
-  
   // Sample stats
   final Map<String, int> stats = {
-    'Total Members': 210,
-    'Pending Requests': 15,
     'Events This Month': 8,
     'Active Projects': 12,
   };
@@ -127,50 +118,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case 'One 2 One':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) =>  OneToOneAdmin()),
+          MaterialPageRoute(builder: (context) => OneToOneAdmin()),
         );
+        break;
+      case 'Circle Meeting':
+        // TODO: Implement navigation to Circle Meeting Registration page
+        break;
+      case 'Committee Members':
+        // TODO: Implement navigation to Committee Members page
         break;
       case 'Profile':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const ProfilePage()),
-        );
-        break;
-      case 'Settings':
-        _showFeatureComingSoon('Settings');
-        break;
-    }
-  }
-
-  void _showFeatureComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature feature coming soon!'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(10),
-      ),
-    );
-  }
-
-  void _onNavItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    
-    switch (index) {
-      case 0: // Dashboard
-        break;
-      case 1: // Members
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const MembersPage()),
-        );
-        break;
-      case 2: // Requests
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const MemberApprovalScreen()),
+          MaterialPageRoute(builder: (context) => const AdminProfilePage()),
         );
         break;
     }
@@ -196,198 +156,217 @@ class _AdminDashboardState extends State<AdminDashboard> {
           elevation: 0,
           backgroundColor: const Color(0xFF1E1E2C),
           leading: IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
+            icon: const Icon(Icons.menu, color: Colors.white, size: 24),
             onPressed: () {
               _scaffoldKey.currentState?.openDrawer();
-              setState(() {
-                _isDrawerOpen = true;
-              });
             },
           ),
           title: const Text(
             'Business Network',
             style: TextStyle(
               color: Colors.white,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
+              fontSize: 20,
             ),
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-              onPressed: () {
-                _showFeatureComingSoon('Notifications');
-              },
-            ),
-            const SizedBox(width: 8),
-          ],
         ),
-        drawer: _buildEnhancedDrawer(),
+        drawer: _buildProfessionalDrawer(),
         body: _buildDashboardContent(),
-        bottomNavigationBar: _buildBottomNavBar(),
       ),
     );
   }
 
-  Widget _buildEnhancedDrawer() {
+  Widget _buildProfessionalDrawer() {
     return Drawer(
-      backgroundColor: const Color(0xFF1E1E2C),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-            decoration: const BoxDecoration(
-              color: Color(0xFF2D2D3F),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF6C63FF), width: 2),
-                      ),
-                      child: const CircleAvatar(
-                        radius: 30,
-                        backgroundColor: Color(0xFF3F3D56),
-                        child: Icon(Icons.person, color: Colors.white, size: 36),
-                      ),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            userName.isNotEmpty ? userName : 'No user data',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+      backgroundColor: Colors.white,
+      child: SingleChildScrollView(
+        child: Container(
+          height: MediaQuery.of(context).size.height,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    color: Colors.white,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              userName.isNotEmpty ? userName : 'Admin User',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6C63FF).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'Admin',
+                            const SizedBox(height: 8),
+                            Text(
+                              userEmail.isNotEmpty ? userEmail : 'admin@example.com',
                               style: TextStyle(
-                                color: const Color(0xFF6C63FF),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
+                                color: Colors.black.withOpacity(0.8),
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.black.withOpacity(0.5),
+                                ),
+                              ),
+                              child: const Text(
+                                'Administrator',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 12),
+                            if (groupCode.isNotEmpty)
+                              Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 20),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.group,
+                                      color: Colors.black,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Group: ',
+                                      style: TextStyle(
+                                        color: Colors.black.withOpacity(0.7),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    Text(
+                                      groupCode,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                _buildDrawerItem(
-                  icon: Icons.person_rounded,
-                  title: 'Profile',
-                  isSelected: _selectedIndex == 0,
-                  onTap: () => _navigateToFeature('Profile'),
-                ),
-                _buildDrawerItem(
-                  icon: Icons.settings_rounded,
-                  title: 'Settings',
-                  isSelected: _selectedIndex == 1,
-                  onTap: () => _navigateToFeature('Settings'),
-                ),
-                const Divider(color: Color(0xFF3F3D56)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Column(
+                      children: [
+                        _buildDrawerMenuItem(
+                          icon: Icons.person_outline,
+                          title: 'My Profile',
+                          onTap: () => _navigateToFeature('Profile'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                child: Container(
+                  width: double.infinity,
+                  height: 50,
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
                       _showLogoutDialog();
                     },
-                    icon: const Icon(Icons.logout_rounded, color: Colors.white),
+                    icon: const Icon(
+                      Icons.logout_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                     label: const Text(
                       'Logout',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Group Code: ',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 12,
-                  ),
-                ),
-                Text(
-                  groupCode.isNotEmpty ? groupCode : 'N/A',
-                  style: const TextStyle(
-                    color: Color(0xFF6C63FF),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildDrawerItem({
+  Widget _buildDrawerMenuItem({
     required IconData icon,
     required String title,
-    bool isSelected = false,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? const Color(0xFF6C63FF) : Colors.white70,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isSelected ? const Color(0xFF6C63FF) : Colors.white,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: Colors.black,
+            size: 20,
+          ),
         ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          color: Colors.black54,
+          size: 16,
+        ),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
-      onTap: onTap,
-      selected: isSelected,
-      selectedTileColor: const Color(0xFF6C63FF).withOpacity(0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
     );
   }
 
@@ -398,119 +377,87 @@ class _AdminDashboardState extends State<AdminDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Text(
-            //   userName.isNotEmpty ? 'Welcome back, $userName!' : 'Welcome back!',
-            //   style: const TextStyle(
-            //     fontSize: 24,
-            //     fontWeight: FontWeight.bold,
-            //     color: Color(0xFF1E2C),
-            //   ),
-            // ),
-           
-            Text(
-              'Here\'s what\'s happening in your network!',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6C63FF), Color(0xFF5A52E8)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6C63FF).withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          userName.isNotEmpty ? 'Welcome back, $userName!' : 'Welcome back!',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Here\'s what\'s happening in your network today',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.dashboard,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            _buildStatsRow(),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            const Text(
+              'Quick Actions',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E1E2C),
+              ),
+            ),
+            const SizedBox(height: 12),
             _buildFeaturesGrid(),
+            const SizedBox(height: 16),
+            const Text(
+              'Committee Members',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E1E2C),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildCommitteeMembersGrid(),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildStatsRow() {
-    return Container(
-      height: 100,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: stats.entries.map((entry) {
-          IconData icon;
-          Color color;
-          
-          switch (entry.key) {
-            case 'Total Members':
-              icon = Icons.people_rounded;
-              color = const Color(0xFF6C63FF);
-              break;
-            case 'Pending Requests':
-              icon = Icons.person_add_rounded;
-              color = Colors.orange;
-              break;
-            case 'Events This Month':
-              icon = Icons.event_rounded;
-              color = Colors.green;
-              break;
-            case 'Active Projects':
-              icon = Icons.work_rounded;
-              color = Colors.blue;
-              break;
-            default:
-              icon = Icons.info_rounded;
-              color = Colors.grey;
-          }
-          
-          return Container(
-            width: 160,
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        icon,
-                        color: color,
-                        size: 20,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${entry.value}',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  entry.key,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
       ),
     );
   }
@@ -522,40 +469,54 @@ class _AdminDashboardState extends State<AdminDashboard> {
       {'title': 'Events', 'icon': Icons.event_rounded, 'color': Colors.green},
       {'title': 'Meetings', 'icon': Icons.meeting_room_rounded, 'color': Colors.orange},
       {'title': 'One 2 One', 'icon': Icons.person_pin_rounded, 'color': Colors.purple},
+      {'title': 'Circle Meeting Registration', 'icon': Icons.event_available_rounded, 'color': Colors.teal},
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Quick Access',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E1E2C),
-          ),
-        ),
-        const SizedBox(height: 16),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 1.5,
-          ),
-          itemCount: features.length,
-          itemBuilder: (context, index) {
-            final feature = features[index];
-            return _buildFeatureCard(
-              feature['title'] as String,
-              feature['icon'] as IconData,
-              feature['color'] as Color,
-            );
-          },
-        ),
-      ],
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.4,
+      ),
+      itemCount: features.length,
+      itemBuilder: (context, index) {
+        final feature = features[index];
+        return _buildFeatureCard(
+          feature['title'] as String,
+          feature['icon'] as IconData,
+          feature['color'] as Color,
+        );
+      },
+    );
+  }
+
+  Widget _buildCommitteeMembersGrid() {
+    final committeeMembers = [
+      {'title': 'Secretary', 'icon': Icons.description_rounded, 'color': Colors.orange},
+      {'title': 'Treasurer', 'icon': Icons.account_balance_rounded, 'color': Colors.purple},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.6,
+      ),
+      itemCount: committeeMembers.length,
+      itemBuilder: (context, index) {
+        final member = committeeMembers[index];
+        return _buildFeatureCard(
+          member['title'] as String,
+          member['icon'] as IconData,
+          member['color'] as Color,
+        );
+      },
     );
   }
 
@@ -566,11 +527,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 16,
               offset: const Offset(0, 4),
             ),
           ],
@@ -582,7 +543,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
@@ -590,77 +551,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 size: 24,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF1E1E2C),
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavBarItem(0, Icons.dashboard_rounded, 'Home'),
-              _buildNavBarItem(1, Icons.people_alt_rounded, 'Members'),
-              _buildNavBarItem(2, Icons.person_add_rounded, 'Requests'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavBarItem(int index, IconData icon, String label) {
-    final isSelected = _selectedIndex == index;
-    
-    return InkWell(
-      onTap: () => _onNavItemTapped(index),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6C63FF).withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? const Color(0xFF6C63FF) : Colors.grey,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
                 fontSize: 12,
-                color: isSelected ? const Color(0xFF6C63FF) : Colors.grey,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E1E2C),
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -673,15 +572,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Logout'),
-          content: const Text('Are you sure you want to logout?'),
+          backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Logout',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E1E2C),
+            ),
+          ),
+          content: const Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(color: Color(0xFF1E1E2C)),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -691,6 +603,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text('Logout'),
             ),

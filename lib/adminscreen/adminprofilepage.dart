@@ -1,522 +1,544 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:flutter/foundation.dart'; // For debugPrint
+import 'package:flutter/foundation.dart' show kDebugMode;
 
-class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+class AdminProfilePage extends StatefulWidget {
+  const AdminProfilePage({Key? key}) : super(key: key);
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  _AdminProfilePageState createState() => _AdminProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
-  final _nameController = TextEditingController();
-  final _shortGroupNameController = TextEditingController();
-  final _groupNameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _numberController = TextEditingController();
-  final _panNumController = TextEditingController();
-  final _groupCodeController = TextEditingController();
-  bool _isLoading = false;
-  bool _isEditing = true; // Start in edit mode
-  String _mId = ''; // Store M_ID internally
+class _AdminProfilePageState extends State<AdminProfilePage> {
+  Map<String, dynamic>? profile;
+  bool isLoading = true;
+  String? error;
+  late TextEditingController emailController;
+  late TextEditingController numberController;
+  late TextEditingController groupCodeController;
+  bool isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    debugPrint('ProfilePage: Initializing at ${DateTime.now().toIso8601String()}');
-    _loadUserData();
-  }
-
-  Future<void> _loadUserData() async {
-    debugPrint('ProfilePage: Attempting to load user data');
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      debugPrint('ProfilePage: SharedPreferences keys: ${prefs.getKeys()}');
-      final userId = prefs.getString('G_ID') ?? '';
-      debugPrint('ProfilePage: Retrieved user ID from SharedPreferences: "$userId"');
-
-      if (userId.isEmpty) {
-        debugPrint('ProfilePage: Error - user ID (G_ID) is empty');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User ID not found. Please log in first.')),
-        );
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          Navigator.pop(context);
-        });
-        return;
-      }
-
-      // Fetch M_ID from SharedPreferences
-      _mId = prefs.getString('M_ID') ?? '';
-      debugPrint('ProfilePage: Retrieved M_ID from SharedPreferences: "$_mId"');
-
-      debugPrint('ProfilePage: Fetching profile data from API for G_ID: $userId');
-      final response = await http.get(
-        Uri.parse('https://tagai.caxis.ca/public/api/group-master/$userId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        debugPrint('ProfilePage: API response: $responseData');
-
-        setState(() {
-          _nameController.text = responseData['name']?.toString() ?? '';
-          _shortGroupNameController.text = responseData['short_group_name']?.toString() ?? '';
-          _groupNameController.text = responseData['group_name']?.toString() ?? '';
-          _emailController.text = responseData['email']?.toString() ?? '';
-          _numberController.text = responseData['number']?.toString() ?? '';
-          _panNumController.text = responseData['pan_num']?.toString() ?? '';
-          _groupCodeController.text = responseData['Grop_code']?.toString() ?? '';
-          _mId = responseData['M_ID']?.toString() ?? _mId; // Update M_ID if provided
-        });
-
-        await prefs.setString('name', _nameController.text);
-        await prefs.setString('short_group_name', _shortGroupNameController.text);
-        await prefs.setString('group_name', _groupNameController.text);
-        await prefs.setString('email', _emailController.text);
-        await prefs.setString('number', _numberController.text);
-        await prefs.setString('pan_num', _panNumController.text);
-        await prefs.setString('Grop_code', _groupCodeController.text);
-        await prefs.setString('M_ID', _mId);
-
-        debugPrint('ProfilePage: Loaded data from API and saved to SharedPreferences - '
-            'Name: ${_nameController.text}, '
-            'Short Group Name: ${_shortGroupNameController.text}, '
-            'Group Name: ${_groupNameController.text}, '
-            'Email: ${_emailController.text}, '
-            'Number: ${_numberController.text}, '
-            'PAN Number: ${_panNumController.text}, '
-            'Group Code: ${_groupCodeController.text}, '
-            'M_ID: $_mId');
-
-        if (_nameController.text.isEmpty &&
-            _shortGroupNameController.text.isEmpty &&
-            _groupNameController.text.isEmpty &&
-            _emailController.text.isEmpty &&
-            _numberController.text.isEmpty &&
-            _panNumController.text.isEmpty &&
-            _groupCodeController.text.isEmpty &&
-            _mId.isEmpty) {
-          debugPrint('ProfilePage: Warning - All API fields are empty');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No profile data found. Please update your profile.')),
-          );
-        }
-      } else {
-        final errorJson = jsonDecode(response.body);
-        final errorMessage = errorJson['message'] ?? 'Unknown error';
-        debugPrint('ProfilePage: Failed to fetch profile with status ${response.statusCode}: $errorMessage');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load profile: $errorMessage')),
-        );
-      }
-    } catch (e) {
-      debugPrint('ProfilePage: Error fetching profile data: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading data: $e')),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-      debugPrint('ProfilePage: Finished loading user data at ${DateTime.now().toIso8601String()}');
-    }
-  }
-
-  Future<void> _updateProfile() async {
-    if (_nameController.text.isEmpty ||
-        _shortGroupNameController.text.isEmpty ||
-        _groupNameController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _numberController.text.isEmpty ||
-        _panNumController.text.isEmpty ||
-        _groupCodeController.text.isEmpty ||
-        _mId.isEmpty) {
-      debugPrint('ProfilePage: Update failed - Empty fields: '
-          'Name: ${_nameController.text}, '
-          'Short Group Name: ${_shortGroupNameController.text}, '
-          'Group Name: ${_groupNameController.text}, '
-          'Email: ${_emailController.text}, '
-          'Number: ${_numberController.text}, '
-          'PAN Number: ${_panNumController.text}, '
-          'Group Code: ${_groupCodeController.text}, '
-          'M_ID: $_mId');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
-      return;
-    }
-
-    // Alternative: Skip M_ID validation if not required by API
-    // if (_nameController.text.isEmpty ||
-    //     _shortGroupNameController.text.isEmpty ||
-    //     _groupNameController.text.isEmpty ||
-    //     _emailController.text.isEmpty ||
-    //     _numberController.text.isEmpty ||
-    //     _panNumController.text.isEmpty ||
-    //     _groupCodeController.text.isEmpty) {
-    //   debugPrint('ProfilePage: Update failed - Empty fields: ...');
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text('Please fill all fields')),
-    //   );
-    //   return;
-    // }
-
-    debugPrint('ProfilePage: Attempting to update profile with data - '
-        'Name: ${_nameController.text}, '
-        'Short Group Name: ${_shortGroupNameController.text}, '
-        'Group Name: ${_groupNameController.text}, '
-        'Email: ${_emailController.text}, '
-        'Number: ${_numberController.text}, '
-        'PAN Number: ${_panNumController.text}, '
-        'Group Code: ${_groupCodeController.text}, '
-        'M_ID: $_mId');
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString('G_ID') ?? '';
-      debugPrint('ProfilePage: Retrieved user ID from SharedPreferences: "$userId"');
-
-      if (userId.isEmpty) {
-        debugPrint('ProfilePage: Error - user ID (G_ID) is empty');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User ID not found. Please log in first.')),
-        );
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          Navigator.pop(context);
-        });
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final requestBody = jsonEncode({
-        'id': userId,
-        'name': _nameController.text,
-        'short_group_name': _shortGroupNameController.text,
-        'group_name': _groupNameController.text,
-        'email': _emailController.text,
-        'number': _numberController.text,
-        'pan_num': _panNumController.text,
-        'Grop_code': _groupCodeController.text,
-        'M_ID': _mId,
-      });
-
-      debugPrint('ProfilePage: Sending API request to update profile with body: $requestBody');
-      final response = await http.put(
-        Uri.parse('https://tagai.caxis.ca/public/api/group-master'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: requestBody,
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        await prefs.setString('name', _nameController.text);
-        await prefs.setString('short_group_name', _shortGroupNameController.text);
-        await prefs.setString('group_name', _groupNameController.text);
-        await prefs.setString('email', _emailController.text);
-        await prefs.setString('number', _numberController.text);
-        await prefs.setString('pan_num', _panNumController.text);
-        await prefs.setString('Grop_code', _groupCodeController.text);
-        await prefs.setString('M_ID', _mId);
-        await prefs.setString('G_ID', userId);
-
-        debugPrint('ProfilePage: Profile updated successfully and saved to SharedPreferences');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!')),
-        );
-        setState(() {
-          _isEditing = false; // Exit edit mode after successful update
-        });
-      } else {
-        final errorJson = jsonDecode(response.body);
-        final errorMessage = errorJson['message'] ?? 'Unknown error';
-        debugPrint('ProfilePage: Profile update failed with status ${response.statusCode}: $errorMessage');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Update failed: $errorMessage')),
-        );
-      }
-    } catch (e) {
-      debugPrint('ProfilePage: Error updating profile: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-      debugPrint('ProfilePage: Finished profile update attempt at ${DateTime.now().toIso8601String()}');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    debugPrint('ProfilePage: Building UI, isEditing: $_isEditing, isLoading: $_isLoading');
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : SafeArea(
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                debugPrint('ProfilePage: Back button tapped');
-                                Navigator.pop(context);
-                              },
-                              child: const Icon(
-                                Icons.arrow_back_ios,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Center(
-                          child: Text(
-                            'Edit Profile',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Center(
-                          child: Text(
-                            'Update your information',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(30),
-                          topRight: Radius.circular(30),
-                        ),
-                      ),
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          children: [
-                            _buildInputField(
-                              'Name',
-                              'Enter your name',
-                              _nameController,
-                              Icons.person_outlined,
-                              enabled: _isEditing,
-                            ),
-                            const SizedBox(height: 20),
-                            _buildInputField(
-                              'Short Group Name',
-                              'Enter short name',
-                              _shortGroupNameController,
-                              Icons.short_text_outlined,
-                              enabled: _isEditing,
-                            ),
-                            const SizedBox(height: 20),
-                            _buildInputField(
-                              'Group Name',
-                              'Enter full group name',
-                              _groupNameController,
-                              Icons.corporate_fare_outlined,
-                              enabled: _isEditing,
-                            ),
-                            const SizedBox(height: 20),
-                            _buildInputField(
-                              'Email Address',
-                              'Enter email address',
-                              _emailController,
-                              Icons.email_outlined,
-                              enabled: _isEditing,
-                              keyboardType: TextInputType.emailAddress,
-                            ),
-                            const SizedBox(height: 20),
-                            _buildInputField(
-                              'Phone Number',
-                              'Enter phone number',
-                              _numberController,
-                              Icons.phone_outlined,
-                              enabled: _isEditing,
-                              keyboardType: TextInputType.phone,
-                            ),
-                            const SizedBox(height: 20),
-                            _buildInputField(
-                              'PAN Number',
-                              'Enter PAN number',
-                              _panNumController,
-                              Icons.credit_card,
-                              enabled: _isEditing,
-                            ),
-                            const SizedBox(height: 20),
-                            _buildInputField(
-                              'Group Code',
-                              'Group code',
-                              _groupCodeController,
-                              Icons.code,
-                              enabled: false, // Non-editable
-                            ),
-                            const SizedBox(height: 32),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () {
-                                      debugPrint('ProfilePage: Cancel button tapped');
-                                      setState(() {
-                                        _isEditing = false;
-                                      });
-                                      _loadUserData();
-                                    },
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(25),
-                                      ),
-                                      side: const BorderSide(color: Colors.black),
-                                    ),
-                                    child: const Text(
-                                      'Cancel',
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: _isLoading ? null : _updateProfile,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.black,
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(25),
-                                      ),
-                                    ),
-                                    child: _isLoading
-                                        ? const CircularProgressIndicator(color: Colors.white)
-                                        : const Text(
-                                            'Update Profile',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-    );
-  }
-
-  Widget _buildInputField(
-    String label,
-    String hint,
-    TextEditingController controller,
-    IconData icon, {
-    bool enabled = true,
-    TextInputType? keyboardType,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          enabled: enabled,
-          keyboardType: keyboardType,
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: Icon(icon, color: enabled ? null : Colors.grey),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[200]!),
-            ),
-            filled: !enabled,
-            fillColor: enabled ? null : Colors.grey[50],
-          ),
-          style: TextStyle(
-            color: enabled ? Colors.black : Colors.grey[600],
-          ),
-        ),
-      ],
-    );
+    emailController = TextEditingController();
+    numberController = TextEditingController();
+    groupCodeController = TextEditingController();
+    fetchProfile();
   }
 
   @override
   void dispose() {
-    debugPrint('ProfilePage: Disposing controllers at ${DateTime.now().toIso8601String()}');
-    _nameController.dispose();
-    _shortGroupNameController.dispose();
-    _groupNameController.dispose();
-    _emailController.dispose();
-    _numberController.dispose();
-    _panNumController.dispose();
-    _groupCodeController.dispose();
+    emailController.dispose();
+    numberController.dispose();
+    groupCodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> fetchProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final gId = prefs.getString('G_ID') ?? '461430';
+      
+      if (gId.isEmpty) {
+        setState(() {
+          error = 'Invalid G_ID: G_ID is empty';
+          isLoading = false;
+        });
+        if (kDebugMode) {
+          print('Error: $error');
+        }
+        return;
+      }
+
+      if (kDebugMode) {
+        print('Fetching profile for G_ID: $gId');
+      }
+
+      final response = await http.get(
+        Uri.parse('https://tagai.caxis.ca/public/api/group-master')
+      );
+
+      if (response.statusCode == 200) {
+        dynamic data;
+        try {
+          data = jsonDecode(response.body);
+          if (kDebugMode) {
+            print('API Response: ${jsonEncode(data)}');
+          }
+        } catch (e) {
+          setState(() {
+            error = 'Error parsing API response: $e';
+            isLoading = false;
+          });
+          if (kDebugMode) {
+            print('Error: $error');
+            print('Raw Response: ${response.body}');
+          }
+          return;
+        }
+
+        List<dynamic> groupList;
+        if (data is List) {
+          groupList = data;
+        } else if (data is Map<String, dynamic> && data.containsKey('groups')) {
+          groupList = data['groups'];
+        } else {
+          setState(() {
+            error = 'Unexpected API response format';
+            isLoading = false;
+          });
+          if (kDebugMode) {
+            print('Error: $error');
+          }
+          return;
+        }
+
+        final group = groupList.firstWhere(
+          (item) => item['Grop_code']?.toString() == gId,
+          orElse: () => null,
+        );
+
+        if (group != null) {
+          setState(() {
+            profile = Map<String, dynamic>.from(group);
+            emailController.text = group['email']?.toString() ?? '';
+            numberController.text = group['number']?.toString() ?? '';
+            groupCodeController.text = group['Grop_code']?.toString() ?? '';
+            isLoading = false;
+          });
+          if (kDebugMode) {
+            print('Profile loaded: $profile');
+          }
+        } else {
+          setState(() {
+            error = 'No group found with G_ID: $gId';
+            isLoading = false;
+          });
+          if (kDebugMode) {
+            print('Error: $error');
+          }
+        }
+      } else {
+        setState(() {
+          error = 'Failed to load profile (Status: ${response.statusCode})';
+          isLoading = false;
+        });
+        if (kDebugMode) {
+          print('Error: $error');
+          print('Raw Response: ${response.body}');
+        }
+      }
+    } catch (e) {
+      setState(() {
+        error = 'Error fetching profile: $e';
+        isLoading = false;
+      });
+      if (kDebugMode) {
+        print('Error: $error');
+      }
+    }
+  }
+
+  Future<void> updateProfile() async {
+    if (emailController.text.isEmpty ||
+        !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(emailController.text)) {
+      _showSnackBar('Please enter a valid email', isError: true);
+      if (kDebugMode) {
+        print('Validation Error: Invalid email');
+      }
+      return;
+    }
+
+    if (numberController.text.isEmpty || numberController.text.length < 10) {
+      _showSnackBar('Please enter a valid phone number', isError: true);
+      if (kDebugMode) {
+        print('Validation Error: Invalid phone number');
+      }
+      return;
+    }
+
+    setState(() {
+      isSaving = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://tagai.caxis.ca/public/api/group-master/update'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'Grop_code': profile?['Grop_code']?.toString(),
+          'email': emailController.text,
+          'number': numberController.text,
+        }),
+      );
+
+      if (kDebugMode) {
+        print('Update Request: ${{
+          'Grop_code': profile?['Grop_code']?.toString(),
+          'email': emailController.text,
+          'number': numberController.text,
+        }}');
+        print('Update Response: ${response.statusCode} - ${response.body}');
+      }
+
+      if (response.statusCode == 200) {
+        setState(() {
+          profile?['email'] = emailController.text;
+          profile?['number'] = numberController.text;
+        });
+        _showSnackBar('Profile updated successfully', isError: false);
+      } else {
+        _showSnackBar('Failed to update profile', isError: true);
+        if (kDebugMode) {
+          print('Update Error: Status ${response.statusCode} - ${response.body}');
+        }
+      }
+    } catch (e) {
+      _showSnackBar('Error updating profile: $e', isError: true);
+      if (kDebugMode) {
+        print('Update Error: $e');
+      }
+    } finally {
+      setState(() {
+        isSaving = false;
+      });
+    }
+  }
+
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: isError ? Colors.red[600] : Colors.green[600],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool enabled = true,
+    TextInputType? keyboardType,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      child: TextFormField(
+        controller: controller,
+        enabled: enabled,
+        keyboardType: keyboardType,
+        style: TextStyle(
+          fontSize: 16,
+          color: enabled ? Colors.black : Colors.grey[600],
+        ),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(
+            color: Colors.grey[700],
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(
+            icon,
+            color: Colors.black,
+            size: 22,
+          ),
+          filled: true,
+          fillColor: enabled ? Colors.white : Colors.grey[100],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.black, width: 2),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(String title, String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+              ),
+            )
+          : error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          error!,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: fetchProfile,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : profile == null
+                  ? Center(
+                      child: Text(
+                        'No profile data available',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 16,
+                        ),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Profile Header
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black,
+                                    borderRadius: BorderRadius.circular(40),
+                                  ),
+                                  child: const Icon(
+                                    Icons.person,
+                                    color: Colors.white,
+                                    size: 40,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  profile!['name']?.toString() ?? 'N/A',
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  profile!['group_name']?.toString() ?? 'N/A',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // Group Information
+                          const Text(
+                            'Group Information',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          _buildInfoCard(
+                            'SHORT GROUP NAME',
+                            profile!['short_group_name']?.toString() ?? 'N/A',
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // Contact Information
+                          const Text(
+                            'Contact Information',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          _buildTextField(
+                            controller: emailController,
+                            label: 'Email Address',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+
+                          _buildTextField(
+                            controller: numberController,
+                            label: 'Phone Number',
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                          ),
+
+                          _buildTextField(
+                            controller: groupCodeController,
+                            label: 'Group Code',
+                            icon: Icons.code_outlined,
+                            enabled: false,
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          // Save Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: isSaving ? null : updateProfile,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: isSaving
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Save Changes',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+    );
   }
 }
