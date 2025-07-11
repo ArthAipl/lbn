@@ -4,9 +4,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
 
+// Function to save user data to SharedPreferences
+Future<void> saveUserData(Map<String, dynamic> userData) async {
+  try {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    print('DEBUG: Saving userData: $userData');
+    await prefs.setString('user_email', userData['email']?.toString() ?? '');
+    await prefs.setInt('user_role', int.parse(userData['role_id'].toString()));
+    await prefs.setString('group_code', userData['Grop_code']?.toString() ?? '');
+    await prefs.setString('member_id', userData['M_ID']?.toString() ?? '');
+    print('DEBUG: Successfully saved user data - user_email: ${userData['email']}, user_role: ${userData['role_id']}, group_code: ${userData['Grop_code']}, member_id: ${userData['M_ID']?.toString() ?? ''}');
+    print('DEBUG: Verified member_id in SharedPreferences: ${prefs.getString('member_id')}');
+  } catch (e) {
+    print('DEBUG ERROR: Failed to save user data in SharedPreferences: $e');
+  }
+}
+
 Future<void> _showPresentationDialog(BuildContext context, Meeting meeting) async {
   try {
-    // Check presentation slots before showing dialog
+    print('DEBUG: Checking presentation slots for meeting M_C_Id: ${meeting.mcId}');
     final slotResponse = await http.get(
       Uri.parse('https://tagai.caxis.ca/public/api/pres-tracks?M_C_Id=${meeting.mcId}'),
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
@@ -14,12 +30,13 @@ Future<void> _showPresentationDialog(BuildContext context, Meeting meeting) asyn
 
     if (slotResponse.statusCode == 200) {
       final data = json.decode(slotResponse.body);
+      print('DEBUG: Presentation slots response: $data');
       List<dynamic> presentationData = data is List ? data : data['data'] ?? [];
       int presentationCount = presentationData
           .where((item) => item['M_C_Id'].toString() == meeting.mcId.toString())
           .length;
+      print('DEBUG: Presentation count for M_C_Id ${meeting.mcId}: $presentationCount');
 
-      // Assuming a maximum of 3 presentation slots per meeting
       const int maxSlots = 3;
       if (presentationCount >= maxSlots) {
         if (context.mounted) {
@@ -31,9 +48,11 @@ Future<void> _showPresentationDialog(BuildContext context, Meeting meeting) asyn
             ),
           );
         }
+        print('DEBUG: Presentation slots are full for meeting M_C_Id: ${meeting.mcId}');
         return;
       }
     } else {
+      print('DEBUG ERROR: Failed to check presentation slots: Status Code ${slotResponse.statusCode}, Response Body: ${slotResponse.body}');
       throw Exception('Failed to check presentation slots: ${slotResponse.statusCode}');
     }
 
@@ -78,7 +97,7 @@ Future<void> _showPresentationDialog(BuildContext context, Meeting meeting) asyn
       },
     );
   } catch (e) {
-    print('Error checking presentation slots: $e');
+    print('DEBUG ERROR: Error checking presentation slots for M_C_Id ${meeting.mcId}: $e');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -93,30 +112,78 @@ Future<void> _showPresentationDialog(BuildContext context, Meeting meeting) asyn
 
 Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, String presStatus) async {
   try {
+    print('DEBUG: Submitting presentation status for M_C_Id: ${meeting.mcId}, Pres_Status: $presStatus');
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? userId = prefs.getString('user_id');
+    String? memberId = prefs.getString('member_id');
+    String? groupCode = prefs.getString('group_code');
+    String? token = prefs.getString('auth_token');
 
-    if (userId == null) {
-      throw Exception('Missing user_id in SharedPreferences');
+    print('DEBUG: SharedPreferences state - member_id: $memberId, group_code: $groupCode, auth_token: $token');
+
+    if (memberId == null || memberId.isEmpty) {
+      print('DEBUG ERROR: Missing or empty member_id in SharedPreferences for M_C_Id: ${meeting.mcId}');
+      try {
+        final userResponse = await http.get(
+          Uri.parse('https://tagai.caxis.ca/public/api/user'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 15));
+        print('DEBUG: User API response - Status Code: ${userResponse.statusCode}, Body: ${userResponse.body}');
+        if (userResponse.statusCode == 200) {
+          final userData = json.decode(userResponse.body);
+          memberId = userData['M_ID']?.toString();
+          if (memberId != null && memberId.isNotEmpty) {
+            await prefs.setString('member_id', memberId);
+            print('DEBUG: Refreshed member_id from API: $memberId');
+          } else {
+            throw Exception('Invalid M_ID in user API response: $memberId');
+          }
+        } else {
+          throw Exception('Failed to fetch user data: ${userResponse.statusCode} - ${userResponse.body}');
+        }
+      } catch (e) {
+        print('DEBUG ERROR: Failed to fetch member_id from API: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('User ID is missing or invalid. Please log out and log in again.'),
+              backgroundColor: Colors.black,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      }
     }
+
+    print('DEBUG: Using member_id: $memberId for M_C_Id: ${meeting.mcId}, G_ID: ${meeting.gId}');
 
     final now = DateTime.now().toIso8601String();
     final payload = {
       'M_C_Id': meeting.mcId.toString(),
       'G_ID': meeting.gId,
-      'M_ID': userId,
+      'M_ID': memberId, // Changed from 'm_id' to 'M_ID' to match backend expectation
       'Pres_Status': presStatus,
       'created_at': now,
       'updated_at': now,
     };
 
-    print('Submitting presentation status with payload: ${json.encode(payload)}');
+    print('DEBUG: Submitting presentation status with payload: ${json.encode(payload)}');
 
     final response = await http.post(
       Uri.parse('https://tagai.caxis.ca/public/api/pres-tracks'),
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
       body: json.encode(payload),
     ).timeout(const Duration(seconds: 30));
+
+    print('DEBUG: Presentation status response - Status Code: ${response.statusCode}, Body: ${response.body}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       if (context.mounted) {
@@ -128,20 +195,19 @@ Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, St
           ),
         );
       }
-      print('Presentation status updated successfully: Status Code ${response.statusCode}');
+      print('DEBUG: Presentation status updated successfully for M_C_Id: ${meeting.mcId}, Status Code: ${response.statusCode}');
     } else {
-      print('Failed to update presentation status: Status Code ${response.statusCode}');
-      print('Response Body: ${response.body}');
+      print('DEBUG ERROR: Failed to update presentation status: Status Code ${response.statusCode}, Response Body: ${response.body}');
       throw Exception('Failed to update presentation status: ${response.statusCode} - ${response.body}');
     }
   } catch (e) {
-    print('Error updating presentation status: $e');
+    print('DEBUG ERROR: Error updating presentation status for M_C_Id: ${meeting.mcId}: $e');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error updating presentation status: ${e.toString()}'),
+          content: Text('Error updating presentation status: ${e.toString()}. Please try logging in again.'),
           backgroundColor: Colors.black,
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -184,10 +250,13 @@ class _MeetingsPageState extends State<MeetingsPage> {
 
   Future<void> loadUserData() async {
     try {
+      print('DEBUG: Loading user data from SharedPreferences');
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? groupCode = prefs.getString('group_code');
-      String? uId = prefs.getString('user_id');
+      String? uId = prefs.getString('member_id');
       String? uName = prefs.getString('user_name');
+
+      print('DEBUG: Retrieved group_code: $groupCode, member_id: $uId, user_name: $uName');
 
       if (groupCode != null && groupCode.isNotEmpty) {
         setState(() {
@@ -201,9 +270,10 @@ class _MeetingsPageState extends State<MeetingsPage> {
           isLoading = false;
         });
         showErrorMessage('Group code not found. Please login again.');
+        print('DEBUG ERROR: Group code not found in SharedPreferences');
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      print('DEBUG ERROR: Error loading user data: $e');
       setState(() {
         isLoading = false;
       });
@@ -215,6 +285,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
     if (!mounted) return;
 
     try {
+      print('DEBUG: Fetching meetings from API');
       if (!isRefreshing) {
         setState(() {
           isLoading = true;
@@ -230,6 +301,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
 
       if (response.statusCode == 200) {
         final dynamic responseData = json.decode(response.body);
+        print('DEBUG: Meetings API response: $responseData');
         List<dynamic> data = responseData is List ? responseData : responseData['data'] ?? [];
 
         List<Meeting> meetings = [];
@@ -239,6 +311,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
             meetings.add(meeting);
           }
         }
+        print('DEBUG: Filtered ${meetings.length} general meetings for group code: $userGroupCode');
 
         meetings.sort((a, b) {
           DateTime now = DateTime.now();
@@ -260,11 +333,11 @@ class _MeetingsPageState extends State<MeetingsPage> {
           applyFilters();
         }
       } else {
-        print('Failed to load meetings: Status Code ${response.statusCode}, Response Body: ${response.body}');
+        print('DEBUG ERROR: Failed to load meetings: Status Code ${response.statusCode}, Response Body: ${response.body}');
         throw Exception('Failed to load meetings: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching meetings: $e');
+      print('DEBUG ERROR: Error fetching meetings: $e');
       if (mounted) {
         setState(() {
           isLoading = false;
@@ -287,6 +360,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
           searchQuery = value.toLowerCase();
         });
         applyFilters();
+        print('DEBUG: Search query updated: $searchQuery');
       }
     });
   }
@@ -327,6 +401,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
           }).toList();
           break;
       }
+      print('DEBUG: Applied filter: $selectedFilter, ${filtered.length} meetings found');
     }
 
     if (searchQuery.isNotEmpty) {
@@ -336,6 +411,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
             meeting.meetingCategory.toLowerCase().contains(searchQuery) ||
             (meeting.group?.name.toLowerCase().contains(searchQuery) ?? false);
       }).toList();
+      print('DEBUG: Applied search query: $searchQuery, ${filtered.length} meetings found');
     }
 
     if (mounted) {
@@ -354,6 +430,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
           duration: const Duration(seconds: 3),
         ),
       );
+      print('DEBUG: Showing error message: $message');
     }
   }
 
@@ -361,6 +438,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
     setState(() {
       isRefreshing = true;
     });
+    print('DEBUG: Refreshing meetings');
     await fetchMeetings();
   }
 
@@ -375,6 +453,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () {
             Navigator.pop(context);
+            print('DEBUG: Navigating back from MeetingsPage');
           },
         ),
         title: const Text(
@@ -425,6 +504,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
                                   searchQuery = '';
                                 });
                                 applyFilters();
+                                print('DEBUG: Cleared search query');
                               },
                             )
                           : null,
@@ -498,6 +578,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
           selectedFilter = filter;
         });
         applyFilters();
+        print('DEBUG: Selected filter: $filter');
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -581,6 +662,7 @@ class MeetingCard extends StatelessWidget {
             builder: (context) => MeetingDetailsPage(meeting: meeting),
           ),
         );
+        print('DEBUG: Navigating to MeetingDetailsPage for M_C_Id: ${meeting.mcId}');
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -605,10 +687,10 @@ class MeetingCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isToday 
-                    ? Colors.black 
-                    : isUpcoming 
-                        ? Colors.grey[100] 
+                color: isToday
+                    ? Colors.black
+                    : isUpcoming
+                        ? Colors.grey[100]
                         : Colors.grey[50],
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(11),
@@ -621,9 +703,7 @@ class MeetingCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isToday 
-                          ? Colors.white 
-                          : Colors.black,
+                      color: isToday ? Colors.white : Colors.black,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isToday ? Colors.black : Colors.transparent,
@@ -634,20 +714,20 @@ class MeetingCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          isToday 
-                              ? Icons.today 
-                              : isUpcoming 
-                                  ? Icons.schedule 
+                          isToday
+                              ? Icons.today
+                              : isUpcoming
+                                  ? Icons.schedule
                                   : Icons.history,
                           color: isToday ? Colors.black : Colors.white,
                           size: 12,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          isToday 
-                              ? 'TODAY' 
-                              : isUpcoming 
-                                  ? 'UPCOMING' 
+                          isToday
+                              ? 'TODAY'
+                              : isUpcoming
+                                  ? 'UPCOMING'
                                   : 'PAST',
                           style: TextStyle(
                             color: isToday ? Colors.black : Colors.white,
@@ -729,6 +809,7 @@ class MeetingCard extends StatelessWidget {
                                 builder: (context) => AddVisitorPage(meeting: meeting),
                               ),
                             );
+                            print('DEBUG: Navigating to AddVisitorPage for M_C_Id: ${meeting.mcId}');
                           },
                         ),
                       ),
@@ -741,6 +822,7 @@ class MeetingCard extends StatelessWidget {
                           isPrimary: true,
                           onPressed: () {
                             _showPresentationDialog(context, meeting);
+                            print('DEBUG: Opening presentation dialog for M_C_Id: ${meeting.mcId}');
                           },
                         ),
                       ),
@@ -914,6 +996,7 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
 
   Future<void> fetchVisitors() async {
     try {
+      print('DEBUG: Fetching visitors for M_C_Id: ${widget.meeting.mcId}');
       final response = await http.get(
         Uri.parse('https://tagai.caxis.ca/public/api/visitor-invites?M_C_Id=${widget.meeting.mcId}'),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
@@ -921,9 +1004,8 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print('DEBUG: Visitor API Response for M_C_Id ${widget.meeting.mcId}: $data');
         List<dynamic> visitorData = data is List ? data : data['data'] ?? [];
-
-        print('Visitor API Response for M_C_Id ${widget.meeting.mcId}: $visitorData');
 
         List<Visitor> fetchedVisitors = visitorData
             .map((item) => Visitor.fromJson(item))
@@ -939,13 +1021,13 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
           });
         }
 
-        print('Filtered Visitors for M_C_Id ${widget.meeting.mcId}: ${visitors.length}');
+        print('DEBUG: Filtered ${visitors.length} visitors for M_C_Id ${widget.meeting.mcId}');
       } else {
-        print('Failed to load visitors: Status Code ${response.statusCode}, Response Body: ${response.body}');
+        print('DEBUG ERROR: Failed to load visitors: Status Code ${response.statusCode}, Response Body: ${response.body}');
         throw Exception('Failed to load visitors: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching visitors for M_C_Id ${widget.meeting.mcId}: $e');
+      print('DEBUG ERROR: Error fetching visitors for M_C_Id ${widget.meeting.mcId}: $e');
       if (mounted) {
         setState(() {
           isLoadingVisitors = false;
@@ -957,6 +1039,7 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
 
   Future<void> fetchPresentations() async {
     try {
+      print('DEBUG: Fetching presentations for M_C_Id: ${widget.meeting.mcId}');
       final response = await http.get(
         Uri.parse('https://tagai.caxis.ca/public/api/pres-tracks?M_C_Id=${widget.meeting.mcId}'),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
@@ -964,9 +1047,8 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print('DEBUG: Presentation API Response for M_C_Id ${widget.meeting.mcId}: $data');
         List<dynamic> presentationData = data is List ? data : data['data'] ?? [];
-
-        print('Presentation API Response for M_C_Id ${widget.meeting.mcId}: $presentationData');
 
         List<Presentation> fetchedPresentations = presentationData
             .map((item) => Presentation.fromJson(item as Map<String, dynamic>))
@@ -982,13 +1064,13 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
           });
         }
 
-        print('Filtered Presentations for M_C_Id ${widget.meeting.mcId}: ${presentations.length}');
+        print('DEBUG: Filtered ${presentations.length} presentations for M_C_Id ${widget.meeting.mcId}');
       } else {
-        print('Failed to load presentations: Status Code ${response.statusCode}, Response Body: ${response.body}');
+        print('DEBUG ERROR: Failed to load presentations: Status Code ${response.statusCode}, Response Body: ${response.body}');
         throw Exception('Failed to load presentations: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching presentations for M_C_Id ${widget.meeting.mcId}: $e');
+      print('DEBUG ERROR: Error fetching presentations for M_C_Id ${widget.meeting.mcId}: $e');
       if (mounted) {
         setState(() {
           isLoadingPresentations = false;
@@ -1015,6 +1097,7 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () {
             Navigator.pop(context);
+            print('DEBUG: Navigating back from MeetingDetailsPage for M_C_Id: ${widget.meeting.mcId}');
           },
         ),
         title: const Text(
@@ -1182,6 +1265,7 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
                             builder: (context) => AddVisitorPage(meeting: widget.meeting),
                           ),
                         );
+                        print('DEBUG: Navigating to AddVisitorPage from MeetingDetailsPage for M_C_Id: ${widget.meeting.mcId}');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
@@ -1217,6 +1301,7 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
                     child: ElevatedButton(
                       onPressed: () {
                         _showPresentationDialog(context, widget.meeting);
+                        print('DEBUG: Opening presentation dialog from MeetingDetailsPage for M_C_Id: ${widget.meeting.mcId}');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
@@ -1508,6 +1593,7 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
           duration: Duration(seconds: 3),
         ),
       );
+      print('DEBUG ERROR: Validation failed - all fields are required');
       return;
     }
 
@@ -1516,12 +1602,16 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
     });
 
     try {
+      print('DEBUG: Submitting visitor for M_C_Id: ${widget.meeting.mcId}');
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? groupCode = prefs.getString('group_code');
-      String? userId = prefs.getString('user_id');
+      String? memberId = prefs.getString('member_id');
 
-      if (groupCode == null || userId == null) {
-        throw Exception('Missing group_code or user_id');
+      print('DEBUG: Retrieved group_code: $groupCode, member_id: $memberId');
+
+      if (groupCode == null || memberId == null) {
+        print('DEBUG ERROR: Missing group_code or member_id for M_C_Id: ${widget.meeting.mcId}');
+        throw Exception('Missing group_code or member_id');
       }
 
       final payload = {
@@ -1531,16 +1621,18 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
         'Visitor_Phone': _phoneController.text.trim(),
         'M_C_Id': widget.meeting.mcId,
         'G_ID': widget.meeting.gId,
-        'M_ID': userId,
+        'M_ID': memberId, // Changed to match backend expectation
       };
 
-      print('Submitting visitor with payload: ${json.encode(payload)}');
+      print('DEBUG: Submitting visitor with payload: ${json.encode(payload)}');
 
       final response = await http.post(
         Uri.parse('https://tagai.caxis.ca/public/api/visitor-invites'),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: json.encode(payload),
       ).timeout(const Duration(seconds: 30));
+
+      print('DEBUG: Visitor submission response - Status Code: ${response.statusCode}, Body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
@@ -1553,13 +1645,13 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
           );
           Navigator.pop(context);
         }
-        print('Visitor added successfully: Status Code ${response.statusCode}');
+        print('DEBUG: Visitor added successfully for M_C_Id: ${widget.meeting.mcId}, Status Code: ${response.statusCode}');
       } else {
-        print('Failed to add visitor: Status Code ${response.statusCode}, Response Body: ${response.body}');
+        print('DEBUG ERROR: Failed to add visitor: Status Code ${response.statusCode}, Response Body: ${response.body}');
         throw Exception('Failed to add visitor: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error adding visitor: $e');
+      print('DEBUG ERROR: Error adding visitor for M_C_Id: ${widget.meeting.mcId}: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1589,6 +1681,7 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () {
             Navigator.pop(context);
+            print('DEBUG: Navigating back from AddVisitorPage for M_C_Id: ${widget.meeting.mcId}');
           },
         ),
         title: const Text(

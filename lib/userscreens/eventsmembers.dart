@@ -53,30 +53,31 @@ class Event {
 // API Service with booking status management
 class ApiService {
   static const String baseUrl = 'https://tagai.caxis.ca/public/api';
+  static final client = http.Client(); // Use Client to handle redirects
 
   static Future<void> initializePreferences() async {
     final prefs = await SharedPreferences.getInstance();
-    final groupCode = prefs.getString('Group_code');
-    print('initializePreferences: Group_code = $groupCode');
+    final groupCode = prefs.getString('group_code');
+    print('initializePreferences: group_code = $groupCode');
 
     if (groupCode == null || groupCode.isEmpty) {
-      final possibleKeys = ['group_code', 'GroupCode', 'GROUP_CODE'];
+      final possibleKeys = ['group_code', 'GroupCode', 'GROUP_CODE', 'Grop_code'];
       for (var key in possibleKeys) {
         final value = prefs.getString(key);
         if (value != null && value.isNotEmpty) {
-          await prefs.setString('Group_code', value);
-          print('Found Group_code under key $key: $value. Set to Group_code.');
+          await prefs.setString('group_code', value);
+          print('Found group_code under key $key: $value. Set to group_code.');
           return;
         }
       }
-      await prefs.setString('Group_code', '572334');
-      print('No Group_code found. Set default: 572334');
+      await prefs.setString('group_code', '572334');
+      print('No group_code found. Set default: 572334');
     }
   }
 
   static Future<List<Event>> fetchEvents() async {
     try {
-      final response = await http.get(
+      final response = await client.get(
         Uri.parse('$baseUrl/event-cals'),
         headers: {'Content-Type': 'application/json'},
       );
@@ -88,10 +89,10 @@ class ApiService {
         final List<dynamic> jsonData = json.decode(response.body);
         print('Parsed JSON data: ${jsonData.length} items');
         final events = jsonData.map((json) => Event.fromJson(json)).toList();
-        
+
         // Load booking statuses from local storage
         await _loadBookingStatuses(events);
-        
+
         print('Parsed Events: $events');
         return events;
       } else {
@@ -123,8 +124,8 @@ class ApiService {
   static Future<List<Event>> fetchFilteredEvents() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final groupCode = prefs.getString('Group_code') ?? '';
-      print('fetchFilteredEvents: Group_code = $groupCode');
+      final groupCode = prefs.getString('group_code') ?? '';
+      print('fetchFilteredEvents: group_code = $groupCode');
 
       if (groupCode.isEmpty) {
         final allKeys = prefs.getKeys();
@@ -147,7 +148,7 @@ class ApiService {
 
   static Future<List<Event>> fetchBookedEvents(int mId) async {
     try {
-      final response = await http.get(
+      final response = await client.get(
         Uri.parse('$baseUrl/event-tracks?M_ID=$mId&status=1'),
         headers: {'Content-Type': 'application/json'},
       );
@@ -194,7 +195,8 @@ class ApiService {
 
       print('saveEventResponse Request body: $requestBody');
 
-      final response = await http.post(
+      // Follow redirects manually if needed
+      final response = await client.post(
         Uri.parse('$baseUrl/event-tracks'),
         headers: {'Content-Type': 'application/json'},
         body: requestBody,
@@ -206,10 +208,10 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = json.decode(response.body);
         print('saveEventResponse Parsed response: $responseData');
-        
+
         // Save booking status locally
         await _saveBookingStatus(evCalId, status == 1);
-        
+
         if (responseData['Status'] != null && responseData['Status'].toString() != status.toString()) {
           print('Warning: Response Status (${responseData['Status']}) does not match sent Status ($status)');
         }
@@ -221,6 +223,11 @@ class ApiService {
       print('Error saving event response: $e');
       return false;
     }
+  }
+
+  // Clean up the client when done
+  static void dispose() {
+    client.close();
   }
 }
 
@@ -263,6 +270,12 @@ class _EventsPageState extends State<EventsPage> {
       });
       print('Error in EventsPage fetchEvents: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    ApiService.dispose();
+    super.dispose();
   }
 
   void _showMenu() {
@@ -592,11 +605,11 @@ class _BookedEventsPageState extends State<BookedEventsPage> {
       });
 
       final prefs = await SharedPreferences.getInstance();
-      final userIdString = prefs.getString('user_id');
-      final mId = int.tryParse(userIdString ?? '') ?? 0;
+      final memberIdString = prefs.getString('member_id');
+      final mId = int.tryParse(memberIdString ?? '') ?? 0;
 
       if (mId == 0) {
-        throw Exception('User ID (M_ID) not found in preferences. Please log in again.');
+        throw Exception('Member ID (member_id) not found in preferences. Please log in again.');
       }
 
       final fetchedEvents = await ApiService.fetchBookedEvents(mId);
@@ -611,6 +624,12 @@ class _BookedEventsPageState extends State<BookedEventsPage> {
       });
       print('Error in BookedEventsPage fetchBookedEvents: $e');
     }
+  }
+
+  @override
+  void dispose() {
+    ApiService.dispose();
+    super.dispose();
   }
 
   @override
@@ -901,11 +920,11 @@ class EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final eventModeStyle = getEventModeStyle(event.eventMode);
-    
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16), // Reduced margin
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16), // Smaller radius
+        borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -916,8 +935,8 @@ class EventCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06), // Lighter shadow
-            blurRadius: 15, // Reduced blur
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 15,
             offset: const Offset(0, 6),
             spreadRadius: 0,
           ),
@@ -929,7 +948,7 @@ class EventCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.all(16), // Reduced padding
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -962,13 +981,13 @@ class EventCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    
+
                     const Spacer(),
-                    
+
                     // Event Mode badge - positioned at right corner, more highlighted
                     Container(
                       constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.4, // Dynamic width
+                        maxWidth: MediaQuery.of(context).size.width * 0.4,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
@@ -1031,9 +1050,9 @@ class EventCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 12),
-                
+
                 // Booking status indicator - if exists
                 if (event.bookingStatus != null) ...[
                   Align(
@@ -1041,13 +1060,13 @@ class EventCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: event.bookingStatus! 
-                            ? const Color(0xFFECFDF5) 
+                        color: event.bookingStatus!
+                            ? const Color(0xFFECFDF5)
                             : const Color(0xFFFEF2F2),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: event.bookingStatus! 
-                              ? const Color(0xFFA7F3D0) 
+                          color: event.bookingStatus!
+                              ? const Color(0xFFA7F3D0)
                               : const Color(0xFFFECACA),
                         ),
                       ),
@@ -1055,12 +1074,12 @@ class EventCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            event.bookingStatus! 
-                                ? Icons.check_circle_rounded 
+                            event.bookingStatus!
+                                ? Icons.check_circle_rounded
                                 : Icons.cancel_rounded,
                             size: 12,
-                            color: event.bookingStatus! 
-                                ? const Color(0xFF10B981) 
+                            color: event.bookingStatus!
+                                ? const Color(0xFF10B981)
                                 : const Color(0xFFEF4444),
                           ),
                           const SizedBox(width: 4),
@@ -1068,8 +1087,8 @@ class EventCard extends StatelessWidget {
                             event.bookingStatus! ? 'Attending' : 'Not Attending',
                             style: TextStyle(
                               fontSize: 10,
-                              color: event.bookingStatus! 
-                                  ? const Color(0xFF047857) 
+                              color: event.bookingStatus!
+                                  ? const Color(0xFF047857)
                                   : const Color(0xFFDC2626),
                               fontWeight: FontWeight.w600,
                             ),
@@ -1080,12 +1099,12 @@ class EventCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                 ],
-                
+
                 // Event title - smaller font
                 Text(
                   event.title,
                   style: const TextStyle(
-                    fontSize: 16, // Reduced from 22
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF1F2937),
                     height: 1.2,
@@ -1093,23 +1112,23 @@ class EventCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Event description - smaller and fewer lines
                 Text(
                   event.description,
                   style: TextStyle(
-                    fontSize: 13, // Reduced from 16
+                    fontSize: 13,
                     color: Colors.grey[600],
                     height: 1.4,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                
+
                 const SizedBox(height: 12),
-                
+
                 // Time and location info - more compact
                 Row(
                   children: [
@@ -1182,9 +1201,9 @@ class EventCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 12),
-                
+
                 // "Tap for details" text at the bottom
                 Center(
                   child: Container(
@@ -1251,6 +1270,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
   @override
   void dispose() {
     _animationController.dispose();
+    ApiService.dispose();
     super.dispose();
   }
 
@@ -1315,16 +1335,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
         print('Key $key: ${prefs.get(key)} (Type: ${prefs.get(key).runtimeType})');
       }
 
-      final userIdString = prefs.getString('user_id');
+      final memberIdString = prefs.getString('member_id');
       int mId = 0;
-      if (userIdString != null && userIdString.isNotEmpty) {
-        mId = int.tryParse(userIdString) ?? 0;
-        print('Retrieved user_id: $userIdString, Parsed to int: $mId');
+      if (memberIdString != null && memberIdString.isNotEmpty) {
+        mId = int.tryParse(memberIdString) ?? 0;
+        print('Retrieved member_id: $memberIdString, Parsed to int: $mId');
       }
       print('Member ID: $mId');
 
       if (mId == 0) {
-        throw Exception('Member ID (user_id) not found in preferences. Please log in again.');
+        throw Exception('Member ID (member_id) not found in preferences. Please log in again.');
       }
 
       final success = await ApiService.saveEventResponse(
@@ -1372,7 +1392,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          attending 
+                          attending
                               ? 'You\'re all set for this event'
                               : 'Your response has been recorded',
                           style: TextStyle(
@@ -1386,8 +1406,8 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                 ],
               ),
             ),
-            backgroundColor: attending 
-                ? const Color(0xFF10B981) 
+            backgroundColor: attending
+                ? const Color(0xFF10B981)
                 : const Color(0xFF3B82F6),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1465,7 +1485,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
   @override
   Widget build(BuildContext context) {
     final eventModeStyle = getEventModeStyle(widget.event.eventMode);
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -1479,7 +1499,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
           'Event Details',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 16, // Smaller font
+            fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -1509,7 +1529,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                         ],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(20), // Reduced padding
+                        padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1543,7 +1563,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                     ),
                                   ),
                                 ),
-                                
+
                                 Container(
                                   constraints: BoxConstraints(
                                     maxWidth: MediaQuery.of(context).size.width * 0.5,
@@ -1590,22 +1610,22 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                 ),
                               ],
                             ),
-                            
+
                             const SizedBox(height: 16),
-                            
+
                             // Event title - smaller font
                             Text(
                               widget.event.title,
                               style: const TextStyle(
-                                fontSize: 20, // Reduced from 30
+                                fontSize: 20,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFF1F2937),
                                 height: 1.2,
                               ),
                             ),
-                            
+
                             const SizedBox(height: 16),
-                            
+
                             // Time and location info - more compact
                             Column(
                               children: [
@@ -1717,9 +1737,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     // Description Section - more compact
                     Container(
                       width: double.infinity,
@@ -1778,9 +1798,9 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     // RSVP Section - more compact
                     Container(
                       width: double.infinity,
@@ -1827,16 +1847,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                               ),
                             ],
                           ),
-                          
+
                           const SizedBox(height: 16),
-                          
+
                           // Show current status or buttons
                           if (widget.event.bookingStatus != null) ...[
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: widget.event.bookingStatus! 
+                                  colors: widget.event.bookingStatus!
                                       ? [const Color(0xFFECFDF5), const Color(0xFFD1FAE5)]
                                       : [const Color(0xFFFEF2F2), const Color(0xFFFECACA)],
                                 ),
@@ -1853,17 +1873,17 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                   Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: widget.event.bookingStatus! 
-                                          ? const Color(0xFFBBF7D0) 
+                                      color: widget.event.bookingStatus!
+                                          ? const Color(0xFFBBF7D0)
                                           : const Color(0xFFFECACA),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Icon(
-                                      widget.event.bookingStatus! 
-                                          ? Icons.check_circle_rounded 
+                                      widget.event.bookingStatus!
+                                          ? Icons.check_circle_rounded
                                           : Icons.cancel_rounded,
-                                      color: widget.event.bookingStatus! 
-                                          ? const Color(0xFF10B981) 
+                                      color: widget.event.bookingStatus!
+                                          ? const Color(0xFF10B981)
                                           : const Color(0xFFEF4444),
                                       size: 20,
                                     ),
@@ -1878,8 +1898,8 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                           style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w800,
-                                            color: widget.event.bookingStatus! 
-                                                ? const Color(0xFF047857) 
+                                            color: widget.event.bookingStatus!
+                                                ? const Color(0xFF047857)
                                                 : const Color(0xFFDC2626),
                                           ),
                                         ),
@@ -1890,8 +1910,8 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                               : 'You have declined to attend',
                                           style: TextStyle(
                                             fontSize: 13,
-                                            color: widget.event.bookingStatus! 
-                                                ? const Color(0xFF065F46) 
+                                            color: widget.event.bookingStatus!
+                                                ? const Color(0xFF065F46)
                                                 : const Color(0xFFB91C1C),
                                             fontWeight: FontWeight.w500,
                                           ),
@@ -1918,7 +1938,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                 // Yes button
                                 Container(
                                   width: double.infinity,
-                                  height: 48, // Reduced height
+                                  height: 48,
                                   margin: const EdgeInsets.only(bottom: 12),
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
@@ -1982,7 +2002,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                 // No button
                                 Container(
                                   width: double.infinity,
-                                  height: 48, // Reduced height
+                                  height: 48,
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
                                       colors: [Color(0xFFEF4444), Color(0xFFF87171)],
@@ -2048,7 +2068,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
                   ],
                 ),

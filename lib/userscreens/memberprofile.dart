@@ -17,6 +17,8 @@ class _ProfilePageState extends State<ProfilePage> {
   String? number;
   String? userId;
   String? groupId;
+  String? groupCode;
+  int? userRole;
   bool isLoading = true;
   String? errorMessage;
   final _formKey = GlobalKey<FormState>();
@@ -47,8 +49,8 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> fetchUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final storedUserId = prefs.getString('user_id');
-      print('Retrieved user_id from SharedPreferences: $storedUserId');
+      final storedUserId = prefs.getString('member_id');
+      print('Retrieved member_id from SharedPreferences: $storedUserId');
 
       if (storedUserId == null) {
         setState(() {
@@ -84,6 +86,10 @@ class _ProfilePageState extends State<ProfilePage> {
             email = member['email'] ?? prefs.getString('user_email') ?? 'N/A';
             number = member['number'] ?? prefs.getString('user_phone') ?? 'N/A';
             groupId = member['G_ID']?.toString() ?? prefs.getString('group_id');
+            groupCode = member['Grop_code'] ?? prefs.getString('group_code');
+            userRole = member['role_id'] != null
+                ? int.tryParse(member['role_id'].toString()) ?? prefs.getInt('user_role')
+                : prefs.getInt('user_role');
             _nameController.text = name!;
             _emailController.text = email!;
             _numberController.text = number!;
@@ -91,9 +97,14 @@ class _ProfilePageState extends State<ProfilePage> {
             isLoading = false;
           });
 
-          if (groupId != null) {
-            await prefs.setString('group_id', groupId!);
-          }
+          // Update SharedPreferences with fetched data
+          await prefs.setString('member_id', storedUserId);
+          await prefs.setString('user_name', name!);
+          await prefs.setString('user_email', email!);
+          await prefs.setString('user_phone', number!);
+          if (groupId != null) await prefs.setString('group_id', groupId!);
+          if (groupCode != null) await prefs.setString('group_code', groupCode!);
+          if (userRole != null) await prefs.setInt('user_role', userRole!);
         } else {
           print('No matching member found in API, using SharedPreferences data');
           setState(() {
@@ -102,10 +113,11 @@ class _ProfilePageState extends State<ProfilePage> {
             email = prefs.getString('user_email') ?? 'N/A';
             number = prefs.getString('user_phone') ?? 'N/A';
             groupId = prefs.getString('group_id');
+            groupCode = prefs.getString('group_code');
+            userRole = prefs.getInt('user_role');
             _nameController.text = name!;
             _emailController.text = email!;
             _numberController.text = number!;
-            errorMessage = 'User not found in API, showing stored data';
             isLoading = false;
           });
         }
@@ -117,6 +129,8 @@ class _ProfilePageState extends State<ProfilePage> {
           email = prefs.getString('user_email') ?? 'N/A';
           number = prefs.getString('user_phone') ?? 'N/A';
           groupId = prefs.getString('group_id');
+          groupCode = prefs.getString('group_code');
+          userRole = prefs.getInt('user_role');
           _nameController.text = name!;
           _emailController.text = email!;
           _numberController.text = number!;
@@ -150,20 +164,33 @@ class _ProfilePageState extends State<ProfilePage> {
         'Name': _nameController.text,
         'email': _emailController.text,
         'number': _numberController.text,
+        'G_ID': groupId,
+        'Grop_code': groupCode,
+        'role_id': userRole?.toString(),
       };
 
       print('Sending updated data to API: $updatedData');
       final response = await http.put(
         Uri.parse('https://tagai.caxis.ca/public/api/member/$userId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode(updatedData),
       );
 
       print('Save API response status code: ${response.statusCode}');
+      print('Save API response body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Update SharedPreferences with new data
         await prefs.setString('user_name', _nameController.text);
         await prefs.setString('user_email', _emailController.text);
         await prefs.setString('user_phone', _numberController.text);
+        await prefs.setString('member_id', userId!);
+        if (groupId != null) await prefs.setString('group_id', groupId!);
+        if (groupCode != null) await prefs.setString('group_code', groupCode!);
+        if (userRole != null) await prefs.setInt('user_role', userRole!);
 
         setState(() {
           name = _nameController.text;
@@ -175,10 +202,10 @@ class _ProfilePageState extends State<ProfilePage> {
         print('Profile updated successfully');
       } else {
         setState(() {
-          errorMessage = 'Failed to update profile: ${response.statusCode}';
+          errorMessage = 'Failed to update profile: ${response.statusCode} - ${response.body}';
           isLoading = false;
         });
-        print('Error: Failed to update profile, status code: ${response.statusCode}');
+        print('Error: Failed to update profile, status code: ${response.statusCode}, body: ${response.body}');
       }
     } catch (e) {
       setState(() {

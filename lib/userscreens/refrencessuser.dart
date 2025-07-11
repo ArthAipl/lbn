@@ -53,28 +53,24 @@ class _ReferencesPageState extends State<ReferencesPage>
   // Helper method to safely get string value from SharedPreferences
   String? _getStringValue(SharedPreferences prefs, String key) {
     try {
-      // Try to get as string first
       String? stringValue = prefs.getString(key);
       if (stringValue != null && stringValue.isNotEmpty) {
         print('DEBUG: _getStringValue - Key: $key, String Value: $stringValue');
         return stringValue;
       }
       
-      // Try to get as int and convert to string
       int? intValue = prefs.getInt(key);
       if (intValue != null) {
         print('DEBUG: _getStringValue - Key: $key, Int Value: $intValue');
         return intValue.toString();
       }
       
-      // Try to get as double and convert to string
       double? doubleValue = prefs.getDouble(key);
       if (doubleValue != null) {
         print('DEBUG: _getStringValue - Key: $key, Double Value: $doubleValue');
         return doubleValue.toString();
       }
       
-      // Try to get as bool and convert to string
       bool? boolValue = prefs.getBool(key);
       if (boolValue != null) {
         print('DEBUG: _getStringValue - Key: $key, Bool Value: $boolValue');
@@ -94,80 +90,25 @@ class _ReferencesPageState extends State<ReferencesPage>
       print('DEBUG: _loadUserData - Starting to load user data');
       final prefs = await SharedPreferences.getInstance();
       
-      // Print all keys and values to debug
       print('DEBUG: _loadUserData - All SharedPreferences keys: ${prefs.getKeys()}');
       
-      // Print all stored values with their types
       for (String key in prefs.getKeys()) {
         dynamic value = prefs.get(key);
         print('DEBUG: _loadUserData - Key: $key, Value: $value, Type: ${value.runtimeType}');
       }
       
-      // Enhanced key search for User ID
-      List<String> userIdKeys = [
-        'user_id', 'M_ID', 'id', 'userId', 'User_ID', 'member_id', 
-        'memberId', 'user', 'uid', 'ID'
-      ];
+      String? userId = _getStringValue(prefs, 'member_id');
+      String? groupId = _getStringValue(prefs, 'group_code');
       
-      // Enhanced key search for Group ID - prioritize exact matches
-      List<String> groupIdKeys = [
-        'G_ID',           // Exact match first
-        'group_id', 
-        'groupId', 
-        'Group_ID', 
-        'group_code', 
-        'group', 
-        'gid',
-        'g_id'
-      ];
-      
-      String? userId;
-      String? groupId;
-      
-      // Try to find user ID (M_ID)
-      for (String key in userIdKeys) {
-        userId = _getStringValue(prefs, key);
-        if (userId != null && userId.isNotEmpty) {
-          print('DEBUG: _loadUserData - Found user ID with key: $key, value: $userId');
-          break;
-        }
-      }
-      
-      // Try to find group ID (G_ID) - be more specific
-      for (String key in groupIdKeys) {
-        groupId = _getStringValue(prefs, key);
-        if (groupId != null && groupId.isNotEmpty) {
-          print('DEBUG: _loadUserData - Found group ID with key: $key, value: $groupId');
-          break;
-        }
-      }
-      
-      // If still no G_ID found, try a broader search
-      if (groupId == null || groupId.isEmpty) {
-        print('DEBUG: _loadUserData - No G_ID found with standard keys, trying broader search');
-        for (String key in prefs.getKeys()) {
-          String lowerKey = key.toLowerCase();
-          if (lowerKey.contains('group') || lowerKey.contains('g_') || lowerKey == 'gid') {
-            String? potentialGroupId = _getStringValue(prefs, key);
-            if (potentialGroupId != null && potentialGroupId.isNotEmpty) {
-              groupId = potentialGroupId;
-              print('DEBUG: _loadUserData - Found potential group ID with key: $key, value: $groupId');
-              break;
-            }
-          }
-        }
-      }
-      
-      print('DEBUG: _loadUserData - Final User ID (M_ID): $userId');
-      print('DEBUG: _loadUserData - Final Group ID (G_ID): $groupId');
+      print('DEBUG: _loadUserData - Found user ID (member_id): $userId');
+      print('DEBUG: _loadUserData - Found group ID (group_code): $groupId');
       
       setState(() {
         _currentUserId = userId;
         _currentGroupId = groupId;
       });
       
-      // Load data after user data is loaded
-      await _fetchMembers(); // Fetch members first to validate G_ID
+      await _fetchMembers();
       await _fetchReferences();
     } catch (e) {
       print('ERROR: _loadUserData - Failed to load user data: $e');
@@ -194,7 +135,6 @@ class _ReferencesPageState extends State<ReferencesPage>
         
         List<dynamic> allMembers = [];
         
-        // Handle the API response structure
         if (data is Map && data.containsKey('members')) {
           allMembers = data['members'] is List ? data['members'] : [];
         } else if (data is List) {
@@ -206,7 +146,6 @@ class _ReferencesPageState extends State<ReferencesPage>
         
         print('DEBUG: _fetchMembers - All members count: ${allMembers.length}');
         
-        // Extract all unique G_IDs from members to validate our current G_ID
         Set<String> validGroupIds = {};
         String? userGroupId;
         
@@ -215,7 +154,6 @@ class _ReferencesPageState extends State<ReferencesPage>
             String gId = member['G_ID'].toString();
             validGroupIds.add(gId);
             
-            // If this member matches our current user, get their G_ID
             if (member['M_ID'].toString() == _currentUserId) {
               userGroupId = gId;
               print('DEBUG: _fetchMembers - Found current user in members with G_ID: $userGroupId');
@@ -224,46 +162,41 @@ class _ReferencesPageState extends State<ReferencesPage>
         }
         
         print('DEBUG: _fetchMembers - All valid G_IDs from API: $validGroupIds');
-        print('DEBUG: _fetchMembers - Current stored G_ID: $_currentGroupId');
+        print('DEBUG: _fetchMembers - Current stored group_code: $_currentGroupId');
         print('DEBUG: _fetchMembers - User\'s actual G_ID from members: $userGroupId');
         
-        // Update G_ID if we found the user's actual G_ID
         if (userGroupId != null && userGroupId != _currentGroupId) {
-          print('DEBUG: _fetchMembers - Updating G_ID from $_currentGroupId to $userGroupId');
+          print('DEBUG: _fetchMembers - Updating group_code from $_currentGroupId to $userGroupId');
           setState(() {
             _currentGroupId = userGroupId;
           });
           
-          // Save the correct G_ID to SharedPreferences for future use
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('G_ID', userGroupId);
-          print('DEBUG: _fetchMembers - Saved correct G_ID to SharedPreferences');
+          await prefs.setString('group_code', userGroupId);
+          print('DEBUG: _fetchMembers - Saved correct group_code to SharedPreferences');
         }
         
-        // If we still don't have a valid G_ID, use the first available one
         if (_currentGroupId == null || !validGroupIds.contains(_currentGroupId)) {
           if (validGroupIds.isNotEmpty) {
             String fallbackGroupId = validGroupIds.first;
-            print('DEBUG: _fetchMembers - Using fallback G_ID: $fallbackGroupId');
+            print('DEBUG: _fetchMembers - Using fallback group_code: $fallbackGroupId');
             setState(() {
               _currentGroupId = fallbackGroupId;
             });
           }
         }
         
-        // Filter active members
         List<dynamic> filteredMembers = allMembers.where((member) {
           String memberStatus = member['status'].toString();
           return memberStatus == '1';
         }).toList();
         
         print('DEBUG: _fetchMembers - Filtered active members count: ${filteredMembers.length}');
-        print('DEBUG: _fetchMembers - Final G_ID to use: $_currentGroupId');
+        print('DEBUG: _fetchMembers - Final group_code to use: $_currentGroupId');
         
         setState(() {
           _members = filteredMembers;
         });
-        
       } else {
         print('ERROR: _fetchMembers - Failed to fetch members - Status: ${response.statusCode}');
         print('ERROR: _fetchMembers - Response body: ${response.body}');
@@ -374,7 +307,6 @@ class _ReferencesPageState extends State<ReferencesPage>
     print('DEBUG: _sendThankNote - Starting thank note process');
     print('DEBUG: _sendThankNote - Reference data: ${json.encode(reference)}');
     
-    // Show dialog to enter business amount
     String? businessAmount = await _showBusinessAmountDialog();
     
     if (businessAmount == null || businessAmount.isEmpty) {
@@ -384,7 +316,6 @@ class _ReferencesPageState extends State<ReferencesPage>
 
     print('DEBUG: _sendThankNote - Business amount entered: $businessAmount');
 
-    // Validate amount
     double? amount = double.tryParse(businessAmount);
     if (amount == null || amount <= 0) {
       print('ERROR: _sendThankNote - Invalid amount: $businessAmount');
@@ -399,7 +330,6 @@ class _ReferencesPageState extends State<ReferencesPage>
     });
 
     try {
-      // Validate required data before proceeding
       if (_currentUserId == null || _currentUserId!.isEmpty) {
         _showErrorSnackBar('Error: User ID not found. Please restart the app.');
         return;
@@ -410,7 +340,6 @@ class _ReferencesPageState extends State<ReferencesPage>
         return;
       }
 
-      // Try to find the reference ID from different possible field names
       dynamic refTrackId;
       List<String> possibleIdFields = ['id', 'ID', 'ref_track_id', 'ref_track_Id', 'Ref_Track_Id', 'RT_ID'];
       
@@ -429,8 +358,6 @@ class _ReferencesPageState extends State<ReferencesPage>
         return;
       }
 
-      // Prepare the payload with proper data types
-      // Convert to integers if they are numeric strings
       dynamic groupId = _currentGroupId;
       dynamic userId = _currentUserId;
       
@@ -450,11 +377,10 @@ class _ReferencesPageState extends State<ReferencesPage>
         }
       }
 
-      // IMPORTANT: Set M_C_Id to null as requested
       final payload = {
         'Amount': amount,
         'ref_track_Id': refTrackId,
-        'M_C_Id': null, // Explicitly set to null as requested
+        'M_C_Id': null,
         'G_ID': groupId,
         'M_ID': userId,
       };
@@ -463,7 +389,7 @@ class _ReferencesPageState extends State<ReferencesPage>
       print('DEBUG: _sendThankNote - Payload details:');
       print('  - Amount: ${amount.runtimeType} = $amount');
       print('  - ref_track_Id: ${refTrackId.runtimeType} = $refTrackId');
-      print('  - M_C_Id: null (explicitly set to null as requested)');
+      print('  - M_C_Id: null');
       print('  - G_ID: ${groupId.runtimeType} = $groupId');
       print('  - M_ID: ${userId.runtimeType} = $userId');
 
@@ -486,7 +412,6 @@ class _ReferencesPageState extends State<ReferencesPage>
       } else {
         print('ERROR: _sendThankNote - Failed to send thank note - Status: ${response.statusCode}');
         
-        // Parse error message from response
         String errorMessage = 'Failed to send thank note. Please try again.';
         try {
           final errorData = json.decode(response.body);
@@ -529,28 +454,36 @@ class _ReferencesPageState extends State<ReferencesPage>
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
+          backgroundColor: Colors.white,
           title: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.green[100],
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [Colors.green[400]!, Colors.green[600]!],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.monetization_on,
-                  color: Colors.green[700],
+                  color: Colors.white,
                   size: 24,
                 ),
               ),
-              const SizedBox(width: 12),
-              const Text(
-                'Send Thank Note',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  'Send Thank Note',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
               ),
             ],
@@ -561,25 +494,57 @@ class _ReferencesPageState extends State<ReferencesPage>
             children: [
               const Text(
                 'Enter the business amount for this thank note:',
-                style: TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _businessAmountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'Business Amount',
-                  hintText: 'Enter amount (e.g., 1200)',
-                  prefixIcon: const Icon(Icons.attach_money),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.green, width: 2),
-                  ),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.black54,
                 ),
-                autofocus: true,
+              ),
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _businessAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Business Amount',
+                    hintText: 'Enter amount (e.g., 1200)',
+                    prefixIcon: Container(
+                      margin: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.attach_money,
+                        color: Colors.green[700],
+                      ),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.green, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  autofocus: true,
+                ),
               ),
             ],
           ),
@@ -588,24 +553,46 @@ class _ReferencesPageState extends State<ReferencesPage>
               onPressed: () {
                 Navigator.of(context).pop(null);
               },
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
               child: const Text(
                 'Cancel',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(_businessAmountController.text);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 16,
                 ),
               ),
-              child: const Text(
-                'Send Thank Note',
-                style: TextStyle(color: Colors.white),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.green[400]!, Colors.green[600]!],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(_businessAmountController.text);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Send Thank Note',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ],
@@ -627,8 +614,16 @@ class _ReferencesPageState extends State<ReferencesPage>
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red[600],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 5),
       ),
     );
@@ -637,14 +632,21 @@ class _ReferencesPageState extends State<ReferencesPage>
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green[600],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 3),
       ),
     );
   }
 
-  // Filter references for given references
   List<dynamic> get _givenReferences {
     if (_currentUserId == null) return [];
     
@@ -655,7 +657,6 @@ class _ReferencesPageState extends State<ReferencesPage>
     }).toList();
   }
 
-  // Filter references for received references
   List<dynamic> get _receivedReferences {
     if (_currentUserId == null) return [];
     
@@ -672,22 +673,46 @@ class _ReferencesPageState extends State<ReferencesPage>
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.black,
+        elevation: 0,
         title: const Text(
           'References',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.grey[400],
-          isScrollable: true,
-          tabs: const [
-            Tab(text: 'Give Reference'),
-            Tab(text: 'Given References'),
-            Tab(text: 'Received References'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            color: Colors.black,
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: Colors.white,
+              indicatorWeight: 3,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.grey[400],
+              labelStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 14,
+              ),
+              tabs: const [
+                Tab(
+                  text: 'Send Reference',
+                ),
+                Tab(
+                  text: 'Given Reference',
+                ),
+                Tab(
+                  text: 'Received Reference',
+                ),
+              ],
+            ),
+          ),
         ),
       ),
       body: TabBarView(
@@ -703,20 +728,48 @@ class _ReferencesPageState extends State<ReferencesPage>
 
   Widget _buildGivenReferencesTab() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+        ),
+      );
     }
 
     if (_givenReferences.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.send_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('No given references found', style: TextStyle(fontSize: 18, color: Colors.grey)),
-            SizedBox(height: 8),
-            Text('References you\'ve given to others will appear here', 
-                 style: TextStyle(fontSize: 14, color: Colors.grey), textAlign: TextAlign.center),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.send_outlined,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No given references found',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'References you\'ve given to others will appear here',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       );
@@ -724,6 +777,7 @@ class _ReferencesPageState extends State<ReferencesPage>
 
     return RefreshIndicator(
       onRefresh: _fetchReferences,
+      color: Colors.black,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _givenReferences.length,
@@ -737,20 +791,48 @@ class _ReferencesPageState extends State<ReferencesPage>
 
   Widget _buildReceivedReferencesTab() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+        ),
+      );
     }
 
     if (_receivedReferences.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('No received references found', style: TextStyle(fontSize: 18, color: Colors.grey)),
-            SizedBox(height: 8),
-            Text('References others have given to you will appear here', 
-                 style: TextStyle(fontSize: 14, color: Colors.grey), textAlign: TextAlign.center),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.inbox_outlined,
+                size: 64,
+                color: Colors.grey[400],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No received references found',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'References others have given to you will appear here',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       );
@@ -758,6 +840,7 @@ class _ReferencesPageState extends State<ReferencesPage>
 
     return RefreshIndicator(
       onRefresh: _fetchReferences,
+      color: Colors.black,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _receivedReferences.length,
@@ -773,122 +856,239 @@ class _ReferencesPageState extends State<ReferencesPage>
     String status = reference['Status'].toString();
     Color statusColor;
     String statusText;
+    IconData statusIcon;
     
     switch (status) {
       case '0':
         statusColor = Colors.orange;
         statusText = 'Pending';
+        statusIcon = Icons.schedule;
         break;
       case '1':
         statusColor = Colors.green;
         statusText = 'Approved';
+        statusIcon = Icons.check_circle;
         break;
       case '2':
         statusColor = Colors.red;
         statusText = 'Rejected';
+        statusIcon = Icons.cancel;
         break;
       default:
         statusColor = Colors.grey;
         statusText = 'Unknown';
+        statusIcon = Icons.help;
     }
     
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: Colors.black,
-                  radius: 24,
-                  child: Text(
-                    reference['Name']?.substring(0, 1).toUpperCase() ?? 'R',
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.black, Colors.grey[800]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Center(
+                    child: Text(
+                      reference['Name']?.substring(0, 1).toUpperCase() ?? 'R',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(reference['Name'] ?? 'Unknown', 
-                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text(reference['Email'] ?? '', 
-                           style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                      Text(
+                        reference['Name'] ?? 'Unknown',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        reference['Email'] ?? '',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isGiven ? Colors.blue : Colors.green,
+                    gradient: LinearGradient(
+                      colors: isGiven 
+                        ? [Colors.blue[400]!, Colors.blue[600]!]
+                        : [Colors.green[400]!, Colors.green[600]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     isGiven ? 'Given' : 'Received',
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[200]!),
               ),
               child: Text(
                 reference['About'] ?? '',
-                style: TextStyle(color: Colors.grey[700], fontSize: 14, height: 1.4),
+                style: TextStyle(
+                  color: Colors.grey[700],
+                  fontSize: 14,
+                  height: 1.5,
+                ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Row(
               children: [
-                Icon(Icons.phone, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 6),
-                Text(reference['Phone'] ?? '', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.phone,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  reference['Phone'] ?? '',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: statusColor.withOpacity(0.3)),
                   ),
-                  child: Text(statusText, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        statusIcon,
+                        size: 14,
+                        color: statusColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
             
-            // Add Thank Note button for received references
             if (!isGiven) ...[
               const SizedBox(height: 16),
-              SizedBox(
+              Container(
                 width: double.infinity,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: _isSendingThankNote
+                      ? [Colors.grey[400]!, Colors.grey[500]!]
+                      : [Colors.green[400]!, Colors.green[600]!],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: ElevatedButton.icon(
                   onPressed: _isSendingThankNote ? null : () => _sendThankNote(reference),
-                  icon: _isSendingThankNote 
-                      ? const SizedBox(
-                          width: 16, height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
-                        )
-                      : const Icon(Icons.favorite, size: 18),
+                  icon: _isSendingThankNote
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.favorite, size: 18),
                   label: Text(
                     _isSendingThankNote ? 'Sending...' : 'Send Thank Note',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors.transparent,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
@@ -913,7 +1113,7 @@ class _ReferencesPageState extends State<ReferencesPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header Section
+            // Header Card
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -922,126 +1122,192 @@ class _ReferencesPageState extends State<ReferencesPage>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
                 ],
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.person_add, color: Colors.white, size: 32),
-                  const SizedBox(height: 12),
-                  const Text('Give Reference', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                 
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Send Reference',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  Text('Help someone by providing a reference', 
-                       style: TextStyle(fontSize: 14, color: Colors.grey[300]), textAlign: TextAlign.center),
+                  Text(
+                    'Help someone by providing a reference',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[300],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ],
               ),
             ),
             
             const SizedBox(height: 24),
             
-            // Form Section
+            // Form Card
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 2)),
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  ),
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Step 1: Select Member
                   _buildSectionHeader('1', 'Select Member', Icons.people),
                   const SizedBox(height: 16),
                   
+                  // Member Selection Dropdown - FIXED VERSION
                   _isMembersLoading
-                      ? Container(
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                        )
-                      : Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: DropdownButtonFormField<String>(
-                            value: _selectedMemberId,
-                            decoration: InputDecoration(
-                              labelText: 'Choose Member',
-                              prefixIcon: const Icon(Icons.person_search, color: Colors.black),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              filled: true,
-                              fillColor: Colors.grey[50],
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                            ),
-                            hint: Text(
-                              _members.isEmpty ? 'No members available' : 'Select a member to give reference',
-                              style: TextStyle(color: Colors.grey[600], fontSize: 11),
-                            ),
-                            items: _members.isNotEmpty
-                                ? _members.map<DropdownMenuItem<String>>((member) {
-                                    return DropdownMenuItem<String>(
-                                      value: member['M_ID'].toString(),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 8),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: Colors.black,
-                                              child: Text(
-                                                member['Name']?.substring(0, 1).toUpperCase() ?? 'M',
-                                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Flexible(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    member['Name']?.toString() ?? 'Unknown Member',
-                                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                  Text(
-                                                    member['email']?.toString() ?? '',
-                                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  }).toList()
-                                : null,
-                            onChanged: _members.isNotEmpty
-                                ? (String? value) {
-                                    setState(() {
-                                      _selectedMemberId = value;
-                                    });
-                                  }
-                                : null,
+                    ? Container(
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
                           ),
                         ),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedMemberId,
+                          decoration: InputDecoration(
+                            labelText: 'Choose Member',
+                            prefixIcon: Container(
+                              margin: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.person_search,
+                                color: Colors.black,
+                              ),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.grey[300]!),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Colors.black, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                          hint: Text(
+                            _members.isEmpty ? 'No members available' : 'Select a member to give reference',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                          isExpanded: true,
+                          itemHeight: 58, // Reduced from 70
+                          items: _members.isNotEmpty
+                            ? _members.map<DropdownMenuItem<String>>((member) {
+                                return DropdownMenuItem<String>(
+                                  value: member['M_ID'].toString(),
+                                  child: Container(
+                                    height: 50, // Fixed container height
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [Colors.black, Colors.grey[700]!],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              member['Name']?.substring(0, 1).toUpperCase() ?? 'M',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            member['Name']?.toString() ?? 'Unknown Member',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                              height: 1.0, // Remove extra line height
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList()
+                            : null,
+                          onChanged: _members.isNotEmpty
+                            ? (String? value) {
+                                setState(() {
+                                  _selectedMemberId = value;
+                                });
+                              }
+                            : null,
+                        ),
+                      ),
                   
                   const SizedBox(height: 32),
                   
-                  // Step 2: Reference Details
                   _buildSectionHeader('2', 'Reference Details', Icons.description),
                   const SizedBox(height: 16),
                   
@@ -1090,15 +1356,19 @@ class _ReferencesPageState extends State<ReferencesPage>
                     height: 56,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: (_isSubmitting || _members.isEmpty) 
-                            ? [Colors.grey[400]!, Colors.grey[500]!]
-                            : [Colors.black, Colors.grey[800]!],
+                        colors: (_isSubmitting || _members.isEmpty)
+                          ? [Colors.grey[400]!, Colors.grey[500]!]
+                          : [Colors.black, Colors.grey[800]!],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
                       ],
                     ),
                     child: ElevatedButton(
@@ -1106,18 +1376,41 @@ class _ReferencesPageState extends State<ReferencesPage>
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                       child: _isSubmitting
-                          ? const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white))),
-                                SizedBox(width: 12),
-                                Text('Creating Reference...', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-                              ],
-                            )
-                          : const Text('Give Reference', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                        ? const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Creating Reference...',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          )
+                        : const Text(
+                            'Send Reference',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                     ),
                   ),
                 ],
@@ -1133,14 +1426,56 @@ class _ReferencesPageState extends State<ReferencesPage>
     return Row(
       children: [
         Container(
-          width: 32, height: 32,
-          decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(16)),
-          child: Center(child: Text(step, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))),
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.black, Colors.grey[700]!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              step,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: Colors.black,
+            size: 20,
+          ),
         ),
         const SizedBox(width: 12),
-        Icon(icon, color: Colors.black, size: 20),
-        const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
       ],
     );
   }
@@ -1156,7 +1491,13 @@ class _ReferencesPageState extends State<ReferencesPage>
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: TextFormField(
         controller: controller,
@@ -1165,15 +1506,41 @@ class _ReferencesPageState extends State<ReferencesPage>
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          prefixIcon: Icon(icon, color: Colors.black),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[300]!)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.black, width: 2)),
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Colors.black),
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.black, width: 2),
+          ),
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          labelStyle: TextStyle(color: Colors.grey[700]),
-          hintStyle: TextStyle(color: Colors.grey[500]),
+          labelStyle: TextStyle(
+            color: Colors.grey[700],
+            fontSize: 16,
+          ),
+          hintStyle: TextStyle(
+            color: Colors.grey[500],
+            fontSize: 14,
+          ),
+        ),
+        style: const TextStyle(
+          fontSize: 16,
+          color: Colors.black87,
         ),
       ),
     );

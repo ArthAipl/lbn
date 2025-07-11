@@ -3,6 +3,7 @@ import 'package:lbn/adminscreen/meetingsadmin.dart';
 import 'package:lbn/screens/loginscreen.dart';
 import 'package:lbn/screens/settingslbn.dart';
 import 'package:lbn/userscreens/businessprofile.dart';
+import 'package:lbn/userscreens/circlemeetings.dart';
 import 'package:lbn/userscreens/circlemeetinguser.dart';
 import 'package:lbn/userscreens/eventsmembers.dart';
 import 'package:lbn/userscreens/meetingsuser.dart';
@@ -72,7 +73,6 @@ class _UserDashboardState extends State<UserDashboard> {
         ),
         child: Column(
           children: [
-            // Menu Items
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 20),
@@ -180,8 +180,7 @@ class _UserDashboardState extends State<UserDashboard> {
               if (confirm == true) {
                 try {
                   final prefs = await SharedPreferences.getInstance();
-                  await prefs.remove('auth_token');
-                  await prefs.remove('user_id');
+                  await prefs.clear(); // Clears all SharedPreferences data
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -275,7 +274,6 @@ class _UserDashboardState extends State<UserDashboard> {
           padding: const EdgeInsets.all(20),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
-              // Welcome Section
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -319,7 +317,6 @@ class _UserDashboardState extends State<UserDashboard> {
                 ),
               ),
               const SizedBox(height: 24),
-              // Section Title
               const Text(
                 'Quick Actions',
                 style: TextStyle(
@@ -332,7 +329,6 @@ class _UserDashboardState extends State<UserDashboard> {
             ]),
           ),
         ),
-        // Feature Grid with Colorful Icons
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           sliver: SliverGrid(
@@ -340,18 +336,18 @@ class _UserDashboardState extends State<UserDashboard> {
               crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 1.6, // Increased from 1.5 to fix 26-pixel overflow
+              childAspectRatio: 1.6,
             ),
             delegate: SliverChildListDelegate([
               _buildFeatureCard(
                 'Business Profile',
                 'Business information',
                 Icons.business_outlined,
-                const Color(0xFF3B82F6), // Blue
+                const Color(0xFF3B82F6),
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const BusinessDetailsPage()),
+                    MaterialPageRoute(builder: (context) => BusinessProfileScreen()),
                   );
                 },
               ),
@@ -359,7 +355,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 'Members',
                 'Network members',
                 Icons.people_outline,
-                const Color(0xFF10B981), // Green
+                const Color(0xFF10B981),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -371,7 +367,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 'Events',
                 'Networking Events',
                 Icons.event_outlined,
-                const Color(0xFFF59E0B), // Orange
+                const Color(0xFFF59E0B),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -383,7 +379,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 'Meetings',
                 'Network Meetings',
                 Icons.meeting_room_outlined,
-                const Color(0xFF8B5CF6), // Purple
+                const Color(0xFF8B5CF6),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -395,7 +391,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 'One-to-One',
                 'Personal connections',
                 Icons.person_add_outlined,
-                const Color(0xFFEF4444), // Red
+                const Color(0xFFEF4444),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -407,7 +403,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 'Circle Meeting',
                 'Group discussions',
                 Icons.group_outlined,
-                const Color(0xFF06B6D4), // Cyan
+                const Color(0xFF06B6D4),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -419,7 +415,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 'Visitors',
                 'Manage guest access',
                 Icons.person_pin_outlined,
-                const Color(0xFFEC4899), // Pink
+                const Color(0xFFEC4899),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -431,7 +427,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 'Reference',
                 'Important resources',
                 Icons.bookmark_outline,
-                const Color(0xFF84CC16), // Lime
+                const Color(0xFF84CC16),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -442,7 +438,6 @@ class _UserDashboardState extends State<UserDashboard> {
             ]),
           ),
         ),
-        // Bottom padding
         const SliverPadding(
           padding: EdgeInsets.only(bottom: 20),
         ),
@@ -472,13 +467,13 @@ class _UserDashboardState extends State<UserDashboard> {
             borderRadius: BorderRadius.circular(18),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.all(12), // Reduced from 18
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8), // Reduced from 12
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -496,25 +491,25 @@ class _UserDashboardState extends State<UserDashboard> {
                     ),
                     child: Icon(
                       icon,
-                      size: 22, // Reduced from 26
+                      size: 22,
                       color: iconColor,
                     ),
                   ),
-                  const SizedBox(height: 8), // Reduced from 12
+                  const SizedBox(height: 8),
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 14, // Reduced from 15
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
                       letterSpacing: -0.2,
                     ),
                   ),
-                  const SizedBox(height: 2), // Reduced from 3
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: 10, // Reduced from 11
+                      fontSize: 10,
                       fontWeight: FontWeight.w400,
                       color: Colors.grey[600],
                       height: 1.2,

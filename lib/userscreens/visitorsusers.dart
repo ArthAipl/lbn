@@ -24,12 +24,11 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
   String? userPhone;
   int? userRole;
   String? groupCode;
-  Set<String> validGroupIds = {}; // Store valid G_IDs from existing visitors
+  Set<String> validGroupIds = {};
+  Set<String> validUserIds = {};
 
-  // Tab controller
   late TabController _tabController;
 
-  // Form controllers
   final TextEditingController nameController = TextEditingController();
   final TextEditingController aboutController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
@@ -48,57 +47,46 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
     try {
       debugPrint('=== Loading user data from SharedPreferences ===');
       final prefs = await SharedPreferences.getInstance();
-      
-      // Get all user data from SharedPreferences
-      final loadedUserId = prefs.getString('user_id');
+
+      final loadedUserId = prefs.getString('member_id');
       final loadedGroupCode = prefs.getString('group_code');
-      final loadedUserName = prefs.getString('user_name');
       final loadedUserEmail = prefs.getString('user_email');
-      final loadedUserPhone = prefs.getString('user_phone');
       final loadedUserRole = prefs.getInt('user_role');
-      
-      // Try to get G_ID from various possible keys
+
       String? loadedGroupId;
-      loadedGroupId = prefs.getString('G_ID') ?? 
-                     prefs.getString('g_id') ?? 
-                     prefs.getString('group_id');
-      
+      loadedGroupId = prefs.getString('G_ID') ??
+          prefs.getString('g_id') ??
+          prefs.getString('group_id');
+
       debugPrint('=== SharedPreferences Data Retrieved ===');
-      debugPrint('  - user_id: "$loadedUserId" (Type: ${loadedUserId.runtimeType})');
+      debugPrint('  - member_id: "$loadedUserId" (Type: ${loadedUserId.runtimeType})');
       debugPrint('  - group_code: "$loadedGroupCode" (Type: ${loadedGroupCode.runtimeType})');
       debugPrint('  - G_ID: "$loadedGroupId" (Type: ${loadedGroupId.runtimeType})');
-      debugPrint('  - user_name: "$loadedUserName" (Type: ${loadedUserName.runtimeType})');
       debugPrint('  - user_email: "$loadedUserEmail" (Type: ${loadedUserEmail.runtimeType})');
-      debugPrint('  - user_phone: "$loadedUserPhone" (Type: ${loadedUserPhone.runtimeType})');
       debugPrint('  - user_role: $loadedUserRole (Type: ${loadedUserRole.runtimeType})');
-      
-      // Check all available keys in SharedPreferences for debugging
+
       debugPrint('=== All SharedPreferences Keys ===');
       final allKeys = prefs.getKeys();
       for (String key in allKeys) {
         final value = prefs.get(key);
         debugPrint('  - $key: "$value" (Type: ${value.runtimeType})');
       }
-      
+
       setState(() {
         userId = loadedUserId;
         groupId = loadedGroupId;
         groupCode = loadedGroupCode;
-        userName = loadedUserName;
         userEmail = loadedUserEmail;
-        userPhone = loadedUserPhone;
         userRole = loadedUserRole;
       });
-      
+
       debugPrint('=== User Data Set in State ===');
       debugPrint('  - userId: "$userId"');
       debugPrint('  - groupId: "$groupId"');
       debugPrint('  - groupCode: "$groupCode"');
-      debugPrint('  - userName: "$userName"');
       debugPrint('  - userEmail: "$userEmail"');
-      debugPrint('  - userPhone: "$userPhone"');
       debugPrint('  - userRole: $userRole');
-      
+
       if (userId != null && userId!.isNotEmpty) {
         debugPrint('SUCCESS: User ID found, proceeding to fetch data...');
         await _fetchData();
@@ -124,31 +112,29 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
     try {
       debugPrint('=== Starting to fetch data ===');
       debugPrint('Using User ID: "$userId" and Group ID: "$groupId"');
-      
+
       await Future.wait([
         _fetchVisitors(),
         _fetchMeetings(),
       ]);
-      
+
       setState(() {
         isLoading = false;
       });
-      
+
       debugPrint('=== Data fetching completed ===');
       debugPrint('Total visitors loaded: ${visitors.length}');
       debugPrint('Total meetings loaded: ${meetings.length}');
       debugPrint('Valid Group IDs found: $validGroupIds');
-      
+      debugPrint('Valid User IDs found: $validUserIds');
     } catch (e, stackTrace) {
       debugPrint('=== ERROR in _fetchData ===');
       debugPrint('Error: $e');
       debugPrint('StackTrace: $stackTrace');
-      
+      _showErrorSnackBar('Failed to load data: $e');
       setState(() {
         isLoading = false;
       });
-      
-      _showErrorSnackBar('Failed to load data: $e');
     }
   }
 
@@ -157,9 +143,9 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
       debugPrint('=== Fetching Visitors ===');
       debugPrint('API URL: https://tagai.caxis.ca/public/api/visitor-invites');
       debugPrint('Filtering by User ID: "$userId" and Group ID: "$groupId"');
-      
+
       final client = http.Client();
-      
+
       final response = await client.get(
         Uri.parse('https://tagai.caxis.ca/public/api/visitor-invites'),
         headers: {
@@ -173,16 +159,15 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
       debugPrint('  - Status Code: ${response.statusCode}');
       debugPrint('  - Headers: ${response.headers}');
       debugPrint('  - Body Length: ${response.body.length}');
-      
+
       if (response.statusCode == 200) {
         try {
           final List<dynamic> data = json.decode(response.body);
           debugPrint('  - Total visitors in API: ${data.length}');
-          
-          // Collect all unique G_IDs from the API response
+
           Set<String> allGroupIds = {};
           Set<String> allUserIds = {};
-          
+
           for (var visitor in data) {
             if (visitor['G_ID'] != null) {
               allGroupIds.add(visitor['G_ID'].toString());
@@ -191,50 +176,44 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
               allUserIds.add(visitor['M_ID'].toString());
             }
           }
-          
-          debugPrint('=== ALL G_IDs IN DATABASE ===');
+
+          debugPrint('=== ALL IDs IN DATABASE ===');
           debugPrint('Unique G_IDs found: $allGroupIds');
           debugPrint('Unique M_IDs found: $allUserIds');
           debugPrint('Your G_ID "$groupId" exists in database: ${allGroupIds.contains(groupId)}');
           debugPrint('Your M_ID "$userId" exists in database: ${allUserIds.contains(userId)}');
-          
-          // Store valid group IDs for later use
+
           validGroupIds = allGroupIds;
-          
-          // Print first few visitors for debugging
+          validUserIds = allUserIds;
+
           if (data.isNotEmpty) {
             debugPrint('Sample visitor data:');
             for (int i = 0; i < (data.length > 5 ? 5 : data.length); i++) {
               debugPrint('  Visitor ${i + 1}: ${data[i]}');
             }
           }
-          
-          // Filter visitors by current user ID
+
           final filteredVisitors = data
               .where((visitor) {
                 final visitorMId = visitor['M_ID']?.toString();
                 final visitorGId = visitor['G_ID']?.toString();
-                
+
                 debugPrint('Comparing visitor - M_ID: "$visitorMId", G_ID: "$visitorGId"');
                 debugPrint('  with user - ID: "$userId", Group: "$groupId"');
-                
-                // Primary filter: Check if visitor belongs to current user (by M_ID)
+
                 final matchesUserId = visitorMId == userId;
-                
-                // Secondary filter: Check if visitor belongs to same group (by G_ID)
                 final matchesGroupId = groupId != null && visitorGId == groupId;
-                
+
                 debugPrint('  - Matches User ID: $matchesUserId');
                 debugPrint('  - Matches Group ID: $matchesGroupId');
-                
+
                 return matchesUserId || matchesGroupId;
               })
               .cast<Map<String, dynamic>>()
               .toList();
-              
+
           debugPrint('  - Filtered visitors for user: ${filteredVisitors.length}');
-          
-          // Show all visitors that match the criteria
+
           if (filteredVisitors.isNotEmpty) {
             debugPrint('=== VISITORS ADDED BY CURRENT USER/GROUP ===');
             for (int i = 0; i < filteredVisitors.length; i++) {
@@ -253,22 +232,20 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
               debugPrint('  ---');
             }
           }
-          
+
           setState(() {
             visitors = filteredVisitors;
           });
-          
+
           if (filteredVisitors.isEmpty) {
             debugPrint('WARNING: No visitors found for user ID: "$userId" or Group ID: "$groupId"');
           }
-          
         } catch (parseError) {
           debugPrint('ERROR: Failed to parse JSON response');
           debugPrint('Parse Error: $parseError');
           debugPrint('Response body: ${response.body}');
           throw Exception('Failed to parse visitors data');
         }
-        
       } else if (response.statusCode == 302) {
         debugPrint('ERROR: Received redirect (302)');
         debugPrint('Redirect location: ${response.headers['location']}');
@@ -279,9 +256,8 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
         debugPrint('Response Body: ${response.body}');
         throw Exception('Failed to load visitors: ${response.statusCode}');
       }
-      
+
       client.close();
-      
     } catch (e, stackTrace) {
       debugPrint('=== ERROR in _fetchVisitors ===');
       debugPrint('Error Type: ${e.runtimeType}');
@@ -295,9 +271,9 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
     try {
       debugPrint('=== Fetching Meetings ===');
       debugPrint('API URL: https://tagai.caxis.ca/public/api/meeting-cals');
-      
+
       final client = http.Client();
-      
+
       final response = await client.get(
         Uri.parse('https://tagai.caxis.ca/public/api/meeting-cals'),
         headers: {
@@ -316,54 +292,51 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
         try {
           final List<dynamic> data = json.decode(response.body);
           debugPrint('  - Total meetings in API: ${data.length}');
-          
+
           final today = DateTime.now();
           debugPrint('  - Today\'s date for filtering: ${today.toIso8601String()}');
-          
-          // Print first few meetings for debugging
+
           if (data.isNotEmpty) {
             debugPrint('Sample meeting data:');
             for (int i = 0; i < (data.length > 3 ? 3 : data.length); i++) {
               debugPrint('  Meeting ${i + 1}: ${data[i]}');
             }
           }
-          
+
           final filteredMeetings = data
               .where((meeting) {
                 final meetingDateStr = meeting['Meeting_Date']?.toString();
                 debugPrint('Processing meeting date: $meetingDateStr');
-                
+
                 if (meetingDateStr == null || meetingDateStr.isEmpty) {
                   debugPrint('  - Skipping meeting with null/empty date');
                   return false;
                 }
-                
+
                 final meetingDate = DateTime.tryParse(meetingDateStr);
                 if (meetingDate == null) {
                   debugPrint('  - Failed to parse date: $meetingDateStr');
                   return false;
                 }
-                
+
                 final isUpcoming = meetingDate.isAfter(today.subtract(const Duration(days: 1)));
                 debugPrint('  - Meeting date: ${meetingDate.toIso8601String()}, Is upcoming: $isUpcoming');
-                
+
                 return isUpcoming;
               })
               .cast<Map<String, dynamic>>()
               .toList();
-              
+
           debugPrint('  - Filtered upcoming meetings: ${filteredMeetings.length}');
-          
+
           setState(() {
             meetings = filteredMeetings;
           });
-          
         } catch (parseError) {
           debugPrint('ERROR: Failed to parse meetings JSON');
           debugPrint('Parse Error: $parseError');
           throw Exception('Failed to parse meetings data');
         }
-        
       } else if (response.statusCode == 302) {
         debugPrint('ERROR: Meetings API received redirect (302)');
         debugPrint('Redirect location: ${response.headers['location']}');
@@ -374,9 +347,8 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
         debugPrint('Response Body: ${response.body}');
         throw Exception('Failed to load meetings: ${response.statusCode}');
       }
-      
+
       client.close();
-      
     } catch (e, stackTrace) {
       debugPrint('=== ERROR in _fetchMeetings ===');
       debugPrint('Error Type: ${e.runtimeType}');
@@ -389,62 +361,59 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
   Future<void> _addVisitor() async {
     try {
       debugPrint('=== Adding New Visitor ===');
-      
+
       if (!_validateForm()) {
         debugPrint('Form validation failed');
         return;
       }
-      
-      // Ensure we have valid user data
+
       if (userId == null || userId!.isEmpty) {
         debugPrint('ERROR: User ID is null or empty');
         _showErrorSnackBar('User ID not found. Please login again.');
         return;
       }
-      
-      // Determine which G_ID to use
+
+      String? mIdToSend;
       String? gIdToSend;
-      
-      debugPrint('=== DETERMINING G_ID TO USE ===');
+
+      debugPrint('=== DETERMINING IDs TO USE ===');
       debugPrint('Available options:');
-      debugPrint('  - groupId from SharedPreferences: "$groupId"');
-      debugPrint('  - userId as fallback: "$userId"');
+      debugPrint('  - userId (member_id): "$userId"');
+      debugPrint('  - groupId: "$groupId"');
+      debugPrint('  - Valid M_IDs from database: $validUserIds');
       debugPrint('  - Valid G_IDs from database: $validGroupIds');
-      
-      // Strategy 1: Try the groupId from SharedPreferences if it exists in valid G_IDs
+
+      // Validate M_ID
+      if (validUserIds.contains(userId)) {
+        mIdToSend = userId;
+        debugPrint('Using userId as M_ID: "$mIdToSend"');
+      } else {
+        debugPrint('ERROR: User ID "$userId" not found in valid M_IDs: $validUserIds');
+        _showErrorSnackBar('Invalid User ID. Valid M_IDs: ${validUserIds.join(', ')}');
+        return;
+      }
+
+      // Determine G_ID
       if (groupId != null && groupId!.isNotEmpty && validGroupIds.contains(groupId)) {
         gIdToSend = groupId;
         debugPrint('Using groupId from SharedPreferences: "$gIdToSend"');
-      }
-      // Strategy 2: Try userId if it exists in valid G_IDs
-      else if (userId != null && validGroupIds.contains(userId)) {
+      } else if (validGroupIds.contains(userId)) {
         gIdToSend = userId;
         debugPrint('Using userId as G_ID: "$gIdToSend"');
-      }
-      // Strategy 3: Try the first valid G_ID that might be related to this user
-      else if (validGroupIds.isNotEmpty) {
-        // Look for any G_ID that might be related to the user
-        for (String validGId in validGroupIds) {
-          // You might want to add logic here to determine which G_ID belongs to the user
-          // For now, let's try the first one as a test
-          gIdToSend = validGId;
-          debugPrint('Using first available valid G_ID as test: "$gIdToSend"');
-          break;
-        }
-      }
-      // Strategy 4: Use userId as last resort
-      else {
+      } else if (validGroupIds.isNotEmpty) {
+        gIdToSend = validGroupIds.first;
+        debugPrint('Using first available valid G_ID: "$gIdToSend"');
+      } else {
         gIdToSend = userId;
         debugPrint('Using userId as last resort G_ID: "$gIdToSend"');
       }
-      
+
       if (gIdToSend == null || gIdToSend.isEmpty) {
         debugPrint('ERROR: Could not determine valid G_ID');
         _showErrorSnackBar('Cannot determine valid Group ID. Please contact support.');
         return;
       }
-      
-      // Prepare request data
+
       final requestData = {
         'Visitor_Name': nameController.text.trim(),
         'About_Visitor': aboutController.text.trim(),
@@ -452,24 +421,24 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
         'Visitor_Phone': phoneController.text.trim(),
         'M_C_Id': selectedMeetingId,
         'G_ID': gIdToSend,
-        'M_ID': userId,
+        'M_ID': mIdToSend,
       };
-      
+
       debugPrint('=== Request Data for Adding Visitor ===');
       debugPrint('  - Visitor_Name: "${requestData['Visitor_Name']}"');
       debugPrint('  - About_Visitor: "${requestData['About_Visitor']}"');
       debugPrint('  - Visitor_Email: "${requestData['Visitor_Email']}"');
       debugPrint('  - Visitor_Phone: "${requestData['Visitor_Phone']}"');
       debugPrint('  - M_C_Id: "${requestData['M_C_Id']}"');
-      debugPrint('  - G_ID: "${requestData['G_ID']}" (Strategy used: ${gIdToSend == groupId ? 'SharedPreferences groupId' : gIdToSend == userId ? 'userId as G_ID' : 'valid G_ID from database'})');
+      debugPrint('  - G_ID: "${requestData['G_ID']}"');
       debugPrint('  - M_ID: "${requestData['M_ID']}"');
-      
+
       final client = http.Client();
-      
+
       debugPrint('=== Sending POST request to add visitor ===');
       debugPrint('URL: https://tagai.caxis.ca/public/api/visitor-invites');
       debugPrint('Request Body: ${json.encode(requestData)}');
-      
+
       final response = await client.post(
         Uri.parse('https://tagai.caxis.ca/public/api/visitor-invites'),
         headers: {
@@ -487,95 +456,74 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('SUCCESS: Visitor added successfully');
-        
+
         _clearForm();
-        _tabController.animateTo(1); // Switch to visitors list tab
-        
+        _tabController.animateTo(1);
+
         debugPrint('Refreshing visitors list...');
         await _fetchVisitors();
-        
+
         _showSuccessSnackBar('Visitor added successfully');
-        
       } else if (response.statusCode == 302) {
         debugPrint('ERROR: Add visitor API received redirect (302)');
-        debugPrint('This indicates authentication is required');
         debugPrint('Redirect location: ${response.headers['location']}');
         _showErrorSnackBar('Authentication required. Please login again.');
-        
       } else if (response.statusCode == 422) {
         debugPrint('ERROR: Validation error (422)');
         debugPrint('This means the server rejected the data');
-        
+
         try {
           final errorData = json.decode(response.body);
           debugPrint('Parsed Error Data: $errorData');
-          
+
           String errorMessage = 'Validation failed: ';
           if (errorData['message'] != null) {
             errorMessage = errorData['message'];
           }
-          
-          // Check for specific field errors
+
           if (errorData['errors'] != null) {
             final errors = errorData['errors'] as Map<String, dynamic>;
             debugPrint('Field-specific errors:');
             errors.forEach((field, messages) {
               debugPrint('  - $field: $messages');
             });
-            
-            // Show specific G_ID error if present
-            if (errors['G_ID'] != null) {
+
+            if (errors['M_ID'] != null) {
+              debugPrint('=== M_ID VALIDATION ERROR DETAILS ===');
+              debugPrint('  - Sent M_ID: "${requestData['M_ID']}"');
+              debugPrint('  - M_ID Type: ${requestData['M_ID'].runtimeType}');
+              debugPrint('  - Valid M_IDs from database: $validUserIds');
+              debugPrint('  - M_ID exists in valid list: ${validUserIds.contains(requestData['M_ID'])}');
+              errorMessage = 'Invalid User ID. Valid M_IDs: ${validUserIds.join(', ')}';
+            } else if (errors['G_ID'] != null) {
               debugPrint('=== G_ID VALIDATION ERROR DETAILS ===');
               debugPrint('  - Sent G_ID: "${requestData['G_ID']}"');
-              debugPrint('  - G_ID Type: ${requestData['G_ID'].runtimeType}');
-              debugPrint('  - G_ID Length: ${requestData['G_ID'].toString().length}');
-              debugPrint('  - G_ID Value (raw): ${requestData['G_ID']}');
-              debugPrint('  - Error Messages: ${errors['G_ID']}');
-              debugPrint('  - Available user data:');
-              debugPrint('    * userId: "$userId"');
-              debugPrint('    * groupId: "$groupId"');
-              debugPrint('    * groupCode: "$groupCode"');
               debugPrint('  - Valid G_IDs from database: $validGroupIds');
               debugPrint('  - G_ID exists in valid list: ${validGroupIds.contains(requestData['G_ID'])}');
-              debugPrint('=== END G_ID ERROR DETAILS ===');
-              
-              // Suggest trying a different G_ID
-              if (validGroupIds.isNotEmpty) {
-                debugPrint('SUGGESTION: Try using one of these valid G_IDs: $validGroupIds');
-                errorMessage = 'Invalid Group ID. Valid options: ${validGroupIds.join(', ')}';
-              } else {
-                errorMessage = 'Invalid Group ID. No valid Group IDs found in database.';
-              }
+              errorMessage = 'Invalid Group ID. Valid options: ${validGroupIds.join(', ')}';
             }
           }
-          
+
           _showErrorSnackBar(errorMessage);
         } catch (parseError) {
           debugPrint('Failed to parse error response: $parseError');
           _showErrorSnackBar('Validation failed. Please check your input.');
         }
-        
       } else {
         debugPrint('ERROR: Failed to add visitor');
         debugPrint('Status Code: ${response.statusCode}');
-        debugPrint('Error Response: ${response.body}');
-        
+        debugPrint('Response Body: ${response.body}');
         try {
           final errorData = json.decode(response.body);
           debugPrint('Parsed Error Data: $errorData');
           _showErrorSnackBar('Failed to add visitor: ${errorData['message'] ?? 'Unknown error'}');
         } catch (parseError) {
           debugPrint('Failed to parse error response: $parseError');
-          if (response.body.contains('html')) {
-            _showErrorSnackBar('Server returned HTML instead of JSON. Check API endpoint.');
-          } else {
-            _showErrorSnackBar('Failed to add visitor (Status: ${response.statusCode})');
-          }
+          _showErrorSnackBar('Failed to add visitor (Status: ${response.statusCode})');
         }
       }
-      
+
       client.close();
-      
     } catch (e, stackTrace) {
       debugPrint('=== ERROR in _addVisitor ===');
       debugPrint('Error Type: ${e.runtimeType}');
@@ -587,14 +535,14 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
 
   bool _validateForm() {
     debugPrint('=== Validating Form ===');
-    debugPrint('Name: "${nameController.text}" (Empty: ${nameController.text.trim().isEmpty})');
-    debugPrint('About: "${aboutController.text}" (Empty: ${aboutController.text.trim().isEmpty})');
-    debugPrint('Email: "${emailController.text}" (Empty: ${emailController.text.trim().isEmpty})');
-    debugPrint('Phone: "${phoneController.text}" (Empty: ${phoneController.text.trim().isEmpty})');
-    debugPrint('Selected Meeting ID: $selectedMeetingId (Null: ${selectedMeetingId == null})');
-    debugPrint('User ID: "$userId" (Valid: ${userId != null && userId!.isNotEmpty})');
-    debugPrint('Group ID: "$groupId" (Valid: ${groupId != null && groupId!.isNotEmpty})');
-    
+    debugPrint('Name: "${nameController.text}"');
+    debugPrint('About: "${aboutController.text}"');
+    debugPrint('Email: "${emailController.text}"');
+    debugPrint('Phone: "${phoneController.text}"');
+    debugPrint('Selected Meeting ID: $selectedMeetingId');
+    debugPrint('User ID: "$userId"');
+    debugPrint('Group ID: "$groupId"');
+
     if (nameController.text.trim().isEmpty ||
         aboutController.text.trim().isEmpty ||
         emailController.text.trim().isEmpty ||
@@ -604,22 +552,20 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
       _showErrorSnackBar('Please fill all fields');
       return false;
     }
-    
-    // Basic email validation
+
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(emailController.text.trim())) {
       debugPrint('VALIDATION FAILED: Invalid email format');
       _showErrorSnackBar('Please enter a valid email address');
       return false;
     }
-    
-    // Validate user authentication data
+
     if (userId == null || userId!.isEmpty) {
       debugPrint('VALIDATION FAILED: User ID is missing');
       _showErrorSnackBar('User authentication failed. Please login again.');
       return false;
     }
-    
+
     debugPrint('VALIDATION PASSED: All required fields are filled and valid');
     return true;
   }
@@ -637,7 +583,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
   void _showErrorSnackBar(String message) {
     debugPrint('=== SHOWING ERROR SNACKBAR ===');
     debugPrint('Error Message: $message');
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -658,7 +604,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
   void _showSuccessSnackBar(String message) {
     debugPrint('=== SHOWING SUCCESS SNACKBAR ===');
     debugPrint('Success Message: $message');
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -668,7 +614,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, 
+  Widget _buildTextField(String label, TextEditingController controller,
       {TextInputType? keyboardType}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -760,7 +706,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
   void _showVisitorDetails(Map<String, dynamic> visitor) {
     debugPrint('=== Showing Visitor Details ===');
     debugPrint('Visitor Data: $visitor');
-    
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -874,10 +820,10 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
           const SizedBox(height: 16),
           _buildTextField('About', aboutController),
           const SizedBox(height: 16),
-          _buildTextField('Email', emailController, 
+          _buildTextField('Email', emailController,
               keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 16),
-          _buildTextField('Phone', phoneController, 
+          _buildTextField('Phone', phoneController,
               keyboardType: TextInputType.phone),
           const SizedBox(height: 16),
           _buildMeetingDropdown(),
@@ -937,7 +883,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
               itemBuilder: (context, index) {
                 final visitor = visitors[index];
                 debugPrint('Building visitor card for index $index: ${visitor['Visitor_Name']}');
-                
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   elevation: 2,
@@ -1053,7 +999,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
 
   Widget _buildEmptyState() {
     debugPrint('Building empty state widget');
-    
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -1118,7 +1064,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
   Widget build(BuildContext context) {
     debugPrint('=== Building VisitorManagementScreen ===');
     debugPrint('Current state - isLoading: $isLoading, visitors count: ${visitors.length}');
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -1132,21 +1078,21 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
         backgroundColor: Colors.black,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        leading: Platform.isIOS 
-          ? IconButton(
-              icon: const Icon(CupertinoIcons.back, color: Colors.white),
-              onPressed: () {
-                debugPrint('iOS back button pressed');
-                Navigator.of(context).pop();
-              },
-            )
-          : IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () {
-                debugPrint('Android back button pressed');
-                Navigator.of(context).pop();
-              },
-            ),
+        leading: Platform.isIOS
+            ? IconButton(
+                icon: const Icon(CupertinoIcons.back, color: Colors.white),
+                onPressed: () {
+                  debugPrint('iOS back button pressed');
+                  Navigator.of(context).pop();
+                },
+              )
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () {
+                  debugPrint('Android back button pressed');
+                  Navigator.of(context).pop();
+                },
+              ),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
