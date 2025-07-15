@@ -48,22 +48,22 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
       debugPrint('=== Loading user data from SharedPreferences ===');
       final prefs = await SharedPreferences.getInstance();
 
-      final loadedUserId = prefs.getString('member_id');
-      final loadedGroupCode = prefs.getString('group_code');
-      final loadedUserEmail = prefs.getString('user_email');
-      final loadedUserRole = prefs.getInt('user_role');
-
-      String? loadedGroupId;
-      loadedGroupId = prefs.getString('G_ID') ??
-          prefs.getString('g_id') ??
-          prefs.getString('group_id');
+      final loadedUserId = prefs.getString('M_ID');
+      final loadedUserName = prefs.getString('Name');
+      final loadedUserEmail = prefs.getString('email');
+      final loadedUserPhone = prefs.getString('number');
+      final loadedGroupCode = prefs.getString('Grop_code');
+      final loadedGroupId = prefs.getString('G_ID');
+      final loadedUserRole = prefs.getString('role_id');
 
       debugPrint('=== SharedPreferences Data Retrieved ===');
-      debugPrint('  - member_id: "$loadedUserId" (Type: ${loadedUserId.runtimeType})');
-      debugPrint('  - group_code: "$loadedGroupCode" (Type: ${loadedGroupCode.runtimeType})');
+      debugPrint('  - M_ID: "$loadedUserId" (Type: ${loadedUserId.runtimeType})');
+      debugPrint('  - Name: "$loadedUserName" (Type: ${loadedUserName.runtimeType})');
+      debugPrint('  - email: "$loadedUserEmail" (Type: ${loadedUserEmail.runtimeType})');
+      debugPrint('  - number: "$loadedUserPhone" (Type: ${loadedUserPhone.runtimeType})');
+      debugPrint('  - Grop_code: "$loadedGroupCode" (Type: ${loadedGroupCode.runtimeType})');
       debugPrint('  - G_ID: "$loadedGroupId" (Type: ${loadedGroupId.runtimeType})');
-      debugPrint('  - user_email: "$loadedUserEmail" (Type: ${loadedUserEmail.runtimeType})');
-      debugPrint('  - user_role: $loadedUserRole (Type: ${loadedUserRole.runtimeType})');
+      debugPrint('  - role_id: "$loadedUserRole" (Type: ${loadedUserRole.runtimeType})');
 
       debugPrint('=== All SharedPreferences Keys ===');
       final allKeys = prefs.getKeys();
@@ -74,17 +74,21 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
 
       setState(() {
         userId = loadedUserId;
-        groupId = loadedGroupId;
-        groupCode = loadedGroupCode;
+        userName = loadedUserName;
         userEmail = loadedUserEmail;
-        userRole = loadedUserRole;
+        userPhone = loadedUserPhone;
+        groupCode = loadedGroupCode;
+        groupId = loadedGroupId;
+        userRole = loadedUserRole != null ? int.tryParse(loadedUserRole) : null;
       });
 
       debugPrint('=== User Data Set in State ===');
       debugPrint('  - userId: "$userId"');
-      debugPrint('  - groupId: "$groupId"');
-      debugPrint('  - groupCode: "$groupCode"');
+      debugPrint('  - userName: "$userName"');
       debugPrint('  - userEmail: "$userEmail"');
+      debugPrint('  - userPhone: "$userPhone"');
+      debugPrint('  - groupCode: "$groupCode"');
+      debugPrint('  - groupId: "$groupId"');
       debugPrint('  - userRole: $userRole');
 
       if (userId != null && userId!.isNotEmpty) {
@@ -378,7 +382,7 @@ class _VisitorManagementScreenState extends State<VisitorManagementScreen>
 
       debugPrint('=== DETERMINING IDs TO USE ===');
       debugPrint('Available options:');
-      debugPrint('  - userId (member_id): "$userId"');
+      debugPrint('  - userId (M_ID): "$userId"');
       debugPrint('  - groupId: "$groupId"');
       debugPrint('  - Valid M_IDs from database: $validUserIds');
       debugPrint('  - Valid G_IDs from database: $validGroupIds');

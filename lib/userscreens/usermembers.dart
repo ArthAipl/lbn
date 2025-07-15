@@ -13,6 +13,8 @@ class Member {
   final int status;
   final String address;
   final String createdAt;
+  final String gId;
+  final String roleId;
 
   Member({
     required this.id,
@@ -23,10 +25,11 @@ class Member {
     required this.status,
     required this.address,
     required this.createdAt,
+    required this.gId,
+    required this.roleId,
   });
 
   factory Member.fromJson(Map<String, dynamic> json) {
-    // Safely parse M_ID
     final idValue = json['M_ID'];
     if (idValue == null || idValue.toString().isEmpty) {
       throw FormatException('Invalid or missing M_ID: $idValue');
@@ -36,7 +39,6 @@ class Member {
       throw FormatException('Invalid M_ID format: ${idValue.toString()}');
     }
 
-    // Safely parse status
     final statusValue = json['status'];
     final parsedStatus = int.tryParse(statusValue?.toString() ?? '0') ?? 0;
 
@@ -49,7 +51,26 @@ class Member {
       status: parsedStatus,
       address: json['address']?.toString() ?? '',
       createdAt: json['created_at']?.toString() ?? '',
+      gId: json['G_ID']?.toString() ?? '',
+      roleId: json['role_id']?.toString() ?? '',
     );
+  }
+}
+
+// Function to save user data to SharedPreferences
+Future<void> saveUserData(Map<String, dynamic> userData) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('M_ID', userData['M_ID']?.toString() ?? '');
+    await prefs.setString('Name', userData['Name']?.toString() ?? '');
+    await prefs.setString('email', userData['email']?.toString() ?? '');
+    await prefs.setString('number', userData['number']?.toString() ?? '');
+    await prefs.setString('Grop_code', userData['Grop_code']?.toString() ?? '');
+    await prefs.setString('G_ID', userData['G_ID']?.toString() ?? '');
+    await prefs.setString('role_id', userData['role_id']?.toString() ?? '');
+    print('DEBUG: Saved user data to SharedPreferences');
+  } catch (e) {
+    print('DEBUG ERROR: Error saving user data to SharedPreferences: $e');
   }
 }
 
@@ -67,6 +88,8 @@ class _MemberListPageState extends State<MemberListPage> {
   bool isLoading = true;
   String? errorMessage;
   String? groupCode;
+  String? gId;
+  String? roleId;
   final TextEditingController _searchController = TextEditingController();
   bool isSearching = false;
 
@@ -106,21 +129,30 @@ class _MemberListPageState extends State<MemberListPage> {
     });
 
     try {
-      // Load group code from SharedPreferences
+      print('DEBUG: Loading user data from SharedPreferences');
+      // Load data from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      final storedGroupCode = prefs.getString('group_code');
-      print('Stored group_code: $storedGroupCode'); // Debug group_code
+      final storedGroupCode = prefs.getString('Grop_code');
+      final storedGId = prefs.getString('G_ID');
+      final storedRoleId = prefs.getString('role_id');
+      final storedMId = prefs.getString('M_ID');
+      final storedName = prefs.getString('Name');
+
+      print('DEBUG: Retrieved Grop_code: $storedGroupCode, M_ID: $storedMId, Name: $storedName, G_ID: $storedGId, role_id: $storedRoleId');
 
       if (storedGroupCode == null || storedGroupCode.trim().isEmpty) {
+        print('DEBUG ERROR: Group ID not found in SharedPreferences');
         setState(() {
           isLoading = false;
-          errorMessage = 'No valid group code found in preferences';
+          errorMessage = 'Group ID not found. Please login again.';
         });
         return;
       }
 
       setState(() {
         groupCode = storedGroupCode.trim();
+        gId = storedGId;
+        roleId = storedRoleId;
       });
 
       // Fetch members
@@ -128,13 +160,15 @@ class _MemberListPageState extends State<MemberListPage> {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        print('API Response: $jsonData'); // Log for debugging
+        print('DEBUG: API Response: $jsonData');
 
         List<dynamic> data;
 
         // Handle JSON structure
         if (jsonData is Map<String, dynamic> && jsonData.containsKey('members')) {
-          data = jsonData['members'] is List ? jsonData['members'] : [];
+          data = jsonData['members'] is List
+
+ ? jsonData['members'] : [];
         } else {
           setState(() {
             isLoading = false;
@@ -233,7 +267,7 @@ class _MemberListPageState extends State<MemberListPage> {
                 ),
               ),
             ),
-          
+
           // Main Content
           Expanded(
             child: RefreshIndicator(
@@ -275,8 +309,8 @@ class _MemberListPageState extends State<MemberListPage> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    _searchController.text.isNotEmpty 
-                                        ? Icons.search_off 
+                                    _searchController.text.isNotEmpty
+                                        ? Icons.search_off
                                         : Icons.people_outline,
                                     size: 64,
                                     color: Colors.grey[400],
@@ -354,7 +388,7 @@ class _MemberListPageState extends State<MemberListPage> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                
+
                 // Member Info
                 Expanded(
                   child: Column(
@@ -387,7 +421,7 @@ class _MemberListPageState extends State<MemberListPage> {
                     ],
                   ),
                 ),
-                
+
                 // Arrow Icon
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -471,7 +505,7 @@ class MemberDetailsPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Name
                     Text(
                       member.name,
@@ -483,7 +517,7 @@ class MemberDetailsPage extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
-                    
+
                     // Group Code Badge
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -504,9 +538,9 @@ class MemberDetailsPage extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Contact Information Card
             Card(
               elevation: 2,
@@ -528,16 +562,16 @@ class MemberDetailsPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    
+
                     _buildDetailItem(
                       icon: Icons.email_outlined,
                       label: 'Email',
                       value: member.email,
                       iconColor: Colors.red,
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     _buildDetailItem(
                       icon: Icons.phone_outlined,
                       label: 'Phone',
@@ -548,9 +582,9 @@ class MemberDetailsPage extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Additional Information Card
             Card(
               elevation: 2,
@@ -572,16 +606,34 @@ class MemberDetailsPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    
+
                     _buildDetailItem(
                       icon: Icons.badge_outlined,
                       label: 'Member ID',
                       value: member.id.toString(),
                       iconColor: Colors.blue,
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
+                    _buildDetailItem(
+                      icon: Icons.group_outlined,
+                      label: 'Group ID',
+                      value: member.gId,
+                      iconColor: Colors.purple,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    _buildDetailItem(
+                      icon: Icons.person_outline,
+                      label: 'Role ID',
+                      value: member.roleId,
+                      iconColor: Colors.teal,
+                    ),
+
+                    const SizedBox(height: 16),
+
                     _buildDetailItem(
                       icon: Icons.calendar_today_outlined,
                       label: 'Joined Date',

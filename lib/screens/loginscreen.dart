@@ -43,144 +43,147 @@ class _LoginScreenState extends State<LoginScreen> {
     return true;
   }
 
-Future<void> _saveUserData(Map<String, dynamic> userData) async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    // Remove only user-related keys
-    await prefs.remove('user_id');
-    await prefs.remove('user_name');
-    await prefs.remove('user_phone');
-    await prefs.remove('user_email');
-    await prefs.remove('user_role');
-    await prefs.remove('group_code');
-    await prefs.remove('member_id');
+  Future<void> _saveUserData(Map<String, dynamic> userData) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Remove only specified user-related keys
+      await prefs.remove('M_ID');
+      await prefs.remove('Name');
+      await prefs.remove('email');
+      await prefs.remove('number');
+      await prefs.remove('Grop_code');
+      await prefs.remove('G_ID');
+      await prefs.remove('role_id');
 
-    // Validate required fields
-    if (userData['G_ID'] == null ||
-        userData['Name'] == null ||
-        userData['number'] == null ||
-        userData['email'] == null ||
-        userData['role_id'] == null ||
-        userData['Grop_code'] == null) {
-      throw Exception('Missing required user data fields');
-    }
-
-    // Save user data
-    await prefs.setString('user_id', userData['G_ID'].toString());
-    await prefs.setString('user_name', userData['Name']);
-    await prefs.setString('user_phone', userData['number']);
-    await prefs.setString('user_email', userData['email']);
-    await prefs.setInt('user_role', int.parse(userData['role_id'].toString()));
-    await prefs.setString('group_code', userData['Grop_code']);
-    await prefs.setString('member_id', userData['M_ID']?.toString() ?? '');
-
-    debugPrint('User data saved successfully: ${userData.toString()}');
-  } catch (e) {
-    debugPrint('Error saving user data: $e');
-    setState(() {
-      _errorMessage = 'Failed to save user data. Please try again.';
-    });
-  }
-}
-Future<void> _login() async {
-  if (!_validateInputs()) return;
-
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-  });
-
-  try {
-    final response = await http.post(
-      Uri.parse('https://tagai.caxis.ca/public/api/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'identifier': _phoneController.text.trim(),
-        'password': _passwordController.text,
-      }),
-    );
-
-    debugPrint('Response status: ${response.statusCode}');
-    debugPrint('Response body: ${response.body}');
-
-    final responseData = json.decode(response.body);
-
-    if (response.statusCode == 200) {
-      // Check if responseData['data'] exists
-      if (responseData['data'] == null) {
-        setState(() {
-          _errorMessage = 'Invalid response: No user data received';
-        });
-        debugPrint('Error: No user data in response');
-        return;
+      // Validate required fields
+      if (userData['M_ID'] == null ||
+          userData['Name'] == null ||
+          userData['email'] == null ||
+          userData['number'] == null ||
+          userData['Grop_code'] == null ||
+          userData['G_ID'] == null ||
+          userData['role_id'] == null) {
+        throw Exception('Missing required user data fields');
       }
 
-      final userData = responseData['data'];
-      // Check the nested 'status' field in the user data
-      if (userData['status'] == "0") {
-        setState(() {
-          _errorMessage = 'Login denied: Account is inactive or disabled.';
-        });
-        debugPrint('Login denied: Status is 0');
-        return;
-      } else if (userData['status'] == "1") {
-        final userRole = int.tryParse(userData['role_id']?.toString() ?? '');
-        if (userRole == null) {
+      // Save specified user data
+      await prefs.setString('M_ID', userData['M_ID'].toString());
+      await prefs.setString('Name', userData['Name']);
+      await prefs.setString('email', userData['email']);
+      await prefs.setString('number', userData['number']);
+      await prefs.setString('Grop_code', userData['Grop_code']);
+      await prefs.setString('G_ID', userData['G_ID'].toString());
+      await prefs.setString('role_id', userData['role_id'].toString());
+
+      debugPrint('User data saved successfully: ${userData.toString()}');
+    } catch (e) {
+      debugPrint('Error saving user data: $e');
+      setState(() {
+        _errorMessage = 'Failed to save user data. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _login() async {
+    if (!_validateInputs()) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://tagai.caxis.ca/public/api/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'identifier': _phoneController.text.trim(),
+          'password': _passwordController.text,
+        }),
+      );
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: ${response.body}');
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        // Check if responseData['data'] exists
+        if (responseData['data'] == null) {
           setState(() {
-            _errorMessage = 'Invalid user role in response';
+            _errorMessage = 'Invalid response: No user data received';
           });
-          debugPrint('Error: Invalid or missing role_id');
+          debugPrint('Error: No user data in response');
           return;
         }
 
-        await _saveUserData(userData);
+        final userData = responseData['data'];
+        // Check the nested 'status' field in the user data
+        if (userData['status'] == "0") {
+          setState(() {
+            _errorMessage = 'Login denied: Account is inactive or disabled.';
+          });
+          debugPrint('Login denied: Status is 0');
+          return;
+        } else if (userData['status'] == "1") {
+          final userRole = int.tryParse(userData['role_id']?.toString() ?? '');
+          if (userRole == null) {
+            setState(() {
+              _errorMessage = 'Invalid user role in response';
+            });
+            debugPrint('Error: Invalid or missing role_id');
+            return;
+          }
 
-        if (userRole == 2) {
-          debugPrint('Navigating to Admin Dashboard');
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => AdminDashboard()),
-          );
-        } else if (userRole == 3) {
-          debugPrint('Navigating to User Dashboard');
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => UserDashboard()),
-          );
+          await _saveUserData(userData);
+
+          if (userRole == 2) {
+            debugPrint('Navigating to Admin Dashboard');
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => AdminDashboard()),
+            );
+          } else if (userRole == 3) {
+            debugPrint('Navigating to User Dashboard');
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => UserDashboard()),
+            );
+          } else {
+            setState(() {
+              _errorMessage = 'Unknown user role: $userRole';
+            });
+            debugPrint('Error: Unknown user role: $userRole');
+          }
         } else {
           setState(() {
-            _errorMessage = 'Unknown user role: $userRole';
+            _errorMessage = 'Invalid status in response';
           });
-          debugPrint('Error: Unknown user role: $userRole');
+          debugPrint('Error: Invalid status value: ${userData['status']}');
         }
       } else {
+        String errorMsg = responseData['message'] ?? 'Server error';
+        if (responseData['errors'] != null) {
+          final errors = responseData['errors'] as Map<String, dynamic>;
+          errorMsg = errors.values.join(', ');
+        }
         setState(() {
-          _errorMessage = 'Invalid status in response';
+          _errorMessage = errorMsg;
         });
-        debugPrint('Error: Invalid status value: ${userData['status']}');
+        debugPrint('Server error: ${response.statusCode} - $errorMsg');
       }
-    } else {
-      String errorMsg = responseData['message'] ?? 'Server error';
-      if (responseData['errors'] != null) {
-        final errors = responseData['errors'] as Map<String, dynamic>;
-        errorMsg = errors.values.join(', ');
-      }
+    } catch (error) {
       setState(() {
-        _errorMessage = errorMsg;
+        _errorMessage = 'Connection error. Please check your internet.';
       });
-      debugPrint('Server error: ${response.statusCode} - $errorMsg');
+      debugPrint('Connection error: $error');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
-  } catch (error) {
-    setState(() {
-      _errorMessage = 'Connection error. Please check your internet.';
-    });
-    debugPrint('Connection error: $error');
-  } finally {
-    setState(() {
-      _isLoading = false;
-    });
   }
-}
+
   @override
   void dispose() {
     _phoneController.dispose();

@@ -46,6 +46,8 @@ dependencies:
   pull_to_refresh_flutter3: ^2.0.2
   dio: ^5.8.0+1
   cookie_jar: ^4.0.8
+  connectivity_plus: ^6.1.4
+  lucide_icons: ^0.257.0
 
 dev_dependencies:
   flutter_test:

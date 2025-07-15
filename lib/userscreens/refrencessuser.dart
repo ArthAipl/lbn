@@ -36,7 +36,8 @@ class _ReferencesPageState extends State<ReferencesPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadUserData();
+    // Run heavy initialization off the main thread
+    Future.microtask(_loadUserData);
   }
 
   @override
@@ -97,35 +98,58 @@ class _ReferencesPageState extends State<ReferencesPage>
         print('DEBUG: _loadUserData - Key: $key, Value: $value, Type: ${value.runtimeType}');
       }
       
-      String? userId = _getStringValue(prefs, 'member_id');
-      String? groupId = _getStringValue(prefs, 'group_code');
+      // Load all user data from SharedPreferences
+      String? userId = _getStringValue(prefs, 'M_ID');
+      String? groupId = _getStringValue(prefs, 'G_ID');
+      String? name = _getStringValue(prefs, 'Name');
+      String? email = _getStringValue(prefs, 'email');
+      String? number = _getStringValue(prefs, 'number');
+      String? groupCode = _getStringValue(prefs, 'group_code');
+      String? roleId = _getStringValue(prefs, 'role_id');
       
-      print('DEBUG: _loadUserData - Found user ID (member_id): $userId');
-      print('DEBUG: _loadUserData - Found group ID (group_code): $groupId');
+      print('DEBUG: _loadUserData - Found user ID (M_ID): $userId');
+      print('DEBUG: _loadUserData - Found group ID (G_ID): $groupId');
+      print('DEBUG: _loadUserData - Found name: $name');
+      print('DEBUG: _loadUserData - Found email: $email');
+      print('DEBUG: _loadUserData - Found number: $number');
+      print('DEBUG: _loadUserData - Found group code (group_code): $groupCode');
+      print('DEBUG: _loadUserData - Found role ID: $roleId');
       
-      setState(() {
-        _currentUserId = userId;
-        _currentGroupId = groupId;
-      });
+      if (mounted) {
+        setState(() {
+          _currentUserId = userId;
+          _currentGroupId = groupId;
+        });
+      }
       
-      await _fetchMembers();
-      await _fetchReferences();
+      await Future.wait([
+        _fetchMembers(),
+        _fetchReferences(),
+      ]);
     } catch (e) {
       print('ERROR: _loadUserData - Failed to load user data: $e');
+      if (mounted) {
+        _showErrorSnackBar('Failed to load user data. Please check your network and try again.');
+      }
     }
   }
 
   Future<void> _fetchMembers() async {
-    setState(() {
-      _isMembersLoading = true;
-    });
+    if (!mounted) return;
+    if (mounted) {
+      setState(() {
+        _isMembersLoading = true;
+      });
+    }
     try {
       print('DEBUG: _fetchMembers - Starting to fetch members');
-      final response = await http.get(
-        Uri.parse('https://tagai.caxis.ca/public/api/member'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      final response = await _retryHttpRequest(
+        () => http.get(
+          Uri.parse('https://tagai.caxis.ca/public/api/member'),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        ),
       );
       print('DEBUG: _fetchMembers - API Status Code: ${response.statusCode}');
       
@@ -146,6 +170,37 @@ class _ReferencesPageState extends State<ReferencesPage>
         
         print('DEBUG: _fetchMembers - All members count: ${allMembers.length}');
         
+        // Update SharedPreferences with user data if found
+        final prefs = await SharedPreferences.getInstance();
+        dynamic userData;
+        for (var member in allMembers) {
+          if (member['M_ID']?.toString() == _currentUserId) {
+            userData = member;
+            break;
+          }
+        }
+        
+        if (userData != null) {
+          await prefs.setString('M_ID', userData['M_ID']?.toString() ?? '');
+          await prefs.setString('Name', userData['Name']?.toString() ?? '');
+          await prefs.setString('email', userData['email']?.toString() ?? '');
+          await prefs.setString('number', userData['number']?.toString() ?? '');
+          await prefs.setString('group_code', userData['group_code']?.toString() ?? '');
+          await prefs.setString('G_ID', userData['G_ID']?.toString() ?? '');
+          await prefs.setString('role_id', userData['role_id']?.toString() ?? '');
+          
+          print('DEBUG: _fetchMembers - Updated SharedPreferences with user data');
+          print('DEBUG: _fetchMembers - Saved M_ID: ${userData['M_ID']}');
+          print('DEBUG: _fetchMembers - Saved Name: ${userData['Name']}');
+          print('DEBUG: _fetchMembers - Saved email: ${userData['email']}');
+          print('DEBUG: _fetchMembers - Saved number: ${userData['number']}');
+          print('DEBUG: _fetchMembers - Saved group_code: ${userData['group_code']}');
+          print('DEBUG: _fetchMembers - Saved G_ID: ${userData['G_ID']}');
+          print('DEBUG: _fetchMembers - Saved role_id: ${userData['role_id']}');
+        } else {
+          print('DEBUG: _fetchMembers - No user data found for M_ID: $_currentUserId');
+        }
+        
         Set<String> validGroupIds = {};
         String? userGroupId;
         
@@ -154,7 +209,7 @@ class _ReferencesPageState extends State<ReferencesPage>
             String gId = member['G_ID'].toString();
             validGroupIds.add(gId);
             
-            if (member['M_ID'].toString() == _currentUserId) {
+            if (member['M_ID']?.toString() == _currentUserId) {
               userGroupId = gId;
               print('DEBUG: _fetchMembers - Found current user in members with G_ID: $userGroupId');
             }
@@ -162,88 +217,130 @@ class _ReferencesPageState extends State<ReferencesPage>
         }
         
         print('DEBUG: _fetchMembers - All valid G_IDs from API: $validGroupIds');
-        print('DEBUG: _fetchMembers - Current stored group_code: $_currentGroupId');
+        print('DEBUG: _fetchMembers - Current stored G_ID: $_currentGroupId');
         print('DEBUG: _fetchMembers - User\'s actual G_ID from members: $userGroupId');
         
         if (userGroupId != null && userGroupId != _currentGroupId) {
-          print('DEBUG: _fetchMembers - Updating group_code from $_currentGroupId to $userGroupId');
-          setState(() {
-            _currentGroupId = userGroupId;
-          });
-          
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('group_code', userGroupId);
-          print('DEBUG: _fetchMembers - Saved correct group_code to SharedPreferences');
+          print('DEBUG: _fetchMembers - Updating G_ID from $_currentGroupId to $userGroupId');
+          if (mounted) {
+            setState(() {
+              _currentGroupId = userGroupId;
+            });
+          }
+          await prefs.setString('G_ID', userGroupId);
+          print('DEBUG: _fetchMembers - Saved correct G_ID to SharedPreferences');
         }
         
         if (_currentGroupId == null || !validGroupIds.contains(_currentGroupId)) {
           if (validGroupIds.isNotEmpty) {
             String fallbackGroupId = validGroupIds.first;
-            print('DEBUG: _fetchMembers - Using fallback group_code: $fallbackGroupId');
-            setState(() {
-              _currentGroupId = fallbackGroupId;
-            });
+            print('DEBUG: _fetchMembers - Using fallback G_ID: $fallbackGroupId');
+            if (mounted) {
+              setState(() {
+                _currentGroupId = fallbackGroupId;
+              });
+            }
+            await prefs.setString('G_ID', fallbackGroupId);
           }
         }
         
         List<dynamic> filteredMembers = allMembers.where((member) {
-          String memberStatus = member['status'].toString();
+          String memberStatus = member['status']?.toString() ?? '0';
           return memberStatus == '1';
         }).toList();
         
         print('DEBUG: _fetchMembers - Filtered active members count: ${filteredMembers.length}');
-        print('DEBUG: _fetchMembers - Final group_code to use: $_currentGroupId');
+        print('DEBUG: _fetchMembers - Final G_ID to use: $_currentGroupId');
         
-        setState(() {
-          _members = filteredMembers;
-        });
+        if (mounted) {
+          setState(() {
+            _members = filteredMembers;
+          });
+        }
       } else {
         print('ERROR: _fetchMembers - Failed to fetch members - Status: ${response.statusCode}');
         print('ERROR: _fetchMembers - Response body: ${response.body}');
+        if (mounted) {
+          _showErrorSnackBar('Failed to fetch members: HTTP ${response.statusCode}');
+        }
       }
     } catch (e) {
       print('ERROR: _fetchMembers - Exception while fetching members: $e');
+      if (mounted) {
+        _showErrorSnackBar('Failed to fetch members: Network error. Please try again.');
+      }
     } finally {
-      setState(() {
-        _isMembersLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isMembersLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _fetchReferences() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (!mounted) return;
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
     try {
       print('DEBUG: _fetchReferences - Starting to fetch references');
-      final response = await http.get(
-        Uri.parse('https://tagai.caxis.ca/public/api/ref-tracks'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      final response = await _retryHttpRequest(
+        () => http.get(
+          Uri.parse('https://tagai.caxis.ca/public/api/ref-tracks'),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        ),
       );
       print('DEBUG: _fetchReferences - API Status Code: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        setState(() {
-          _references = data is List ? data : [];
-        });
+        if (mounted) {
+          setState(() {
+            _references = data is List ? data : [];
+          });
+        }
         print('DEBUG: _fetchReferences - References loaded: ${_references.length} items');
         print('DEBUG: _fetchReferences - Given references count: ${_givenReferences.length}');
         print('DEBUG: _fetchReferences - Received references count: ${_receivedReferences.length}');
       } else {
         print('ERROR: _fetchReferences - Failed to fetch references - Status: ${response.statusCode}');
-        _showErrorSnackBar('Failed to fetch references');
+        if (mounted) {
+          _showErrorSnackBar('Failed to fetch references: HTTP ${response.statusCode}');
+        }
       }
     } catch (e) {
       print('ERROR: _fetchReferences - Exception while fetching references: $e');
-      _showErrorSnackBar('Error: $e');
+      if (mounted) {
+        _showErrorSnackBar('Failed to fetch references: Network error. Please try again.');
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  // Retry logic for HTTP requests
+  Future<http.Response> _retryHttpRequest(Future<http.Response> Function() request) async {
+    const maxRetries = 3;
+    for (int i = 0; i < maxRetries; i++) {
+      try {
+        final response = await request().timeout(const Duration(seconds: 10));
+        return response;
+      } catch (e) {
+        if (i == maxRetries - 1) rethrow;
+        print('DEBUG: _retryHttpRequest - Retry ${i + 1}/$maxRetries failed: $e');
+        await Future.delayed(Duration(milliseconds: 500 * (i + 1)));
+      }
+    }
+    throw Exception('Failed to complete request after $maxRetries retries');
   }
 
   Future<void> _createReference() async {
@@ -256,9 +353,12 @@ class _ReferencesPageState extends State<ReferencesPage>
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
+    if (!mounted) return;
+    if (mounted) {
+      setState(() {
+        _isSubmitting = true;
+      });
+    }
 
     try {
       final payload = {
@@ -273,33 +373,43 @@ class _ReferencesPageState extends State<ReferencesPage>
 
       print('DEBUG: _createReference - Creating reference with payload: ${json.encode(payload)}');
 
-      final response = await http.post(
-        Uri.parse('https://tagai.caxis.ca/public/api/ref-tracks'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(payload),
+      final response = await _retryHttpRequest(
+        () => http.post(
+          Uri.parse('https://tagai.caxis.ca/public/api/ref-tracks'),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: json.encode(payload),
+        ),
       );
 
       print('DEBUG: _createReference - API Status Code: ${response.statusCode}');
       print('DEBUG: _createReference - API Response Body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _showSuccessSnackBar('Reference created successfully');
-        _clearForm();
-        _fetchReferences();
-        _tabController.animateTo(1);
+        if (mounted) {
+          _showSuccessSnackBar('Reference created successfully');
+          _clearForm();
+          _fetchReferences();
+          _tabController.animateTo(1);
+        }
       } else {
         print('ERROR: _createReference - Failed to create reference - Status: ${response.statusCode}');
-        _showErrorSnackBar('Failed to create reference');
+        if (mounted) {
+          _showErrorSnackBar('Failed to create reference: HTTP ${response.statusCode}');
+        }
       }
     } catch (e) {
       print('ERROR: _createReference - Exception while creating reference: $e');
-      _showErrorSnackBar('Error: $e');
+      if (mounted) {
+        _showErrorSnackBar('Error creating reference: Network error. Please try again.');
+      }
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -319,24 +429,33 @@ class _ReferencesPageState extends State<ReferencesPage>
     double? amount = double.tryParse(businessAmount);
     if (amount == null || amount <= 0) {
       print('ERROR: _sendThankNote - Invalid amount: $businessAmount');
-      _showErrorSnackBar('Please enter a valid business amount');
+      if (mounted) {
+        _showErrorSnackBar('Please enter a valid business amount');
+      }
       return;
     }
 
     print('DEBUG: _sendThankNote - Parsed amount: $amount');
 
-    setState(() {
-      _isSendingThankNote = true;
-    });
+    if (!mounted) return;
+    if (mounted) {
+      setState(() {
+        _isSendingThankNote = true;
+      });
+    }
 
     try {
       if (_currentUserId == null || _currentUserId!.isEmpty) {
-        _showErrorSnackBar('Error: User ID not found. Please restart the app.');
+        if (mounted) {
+          _showErrorSnackBar('Error: User ID not found. Please restart the app.');
+        }
         return;
       }
       
       if (_currentGroupId == null || _currentGroupId!.isEmpty) {
-        _showErrorSnackBar('Error: Group ID not found. Please restart the app.');
+        if (mounted) {
+          _showErrorSnackBar('Error: Group ID not found. Please restart the app.');
+        }
         return;
       }
 
@@ -354,7 +473,9 @@ class _ReferencesPageState extends State<ReferencesPage>
       if (refTrackId == null) {
         print('ERROR: _sendThankNote - Could not find reference ID in reference data');
         print('ERROR: _sendThankNote - Available fields: ${reference.keys.toList()}');
-        _showErrorSnackBar('Error: Could not find reference ID');
+        if (mounted) {
+          _showErrorSnackBar('Error: Could not find reference ID');
+        }
         return;
       }
 
@@ -393,13 +514,15 @@ class _ReferencesPageState extends State<ReferencesPage>
       print('  - G_ID: ${groupId.runtimeType} = $groupId');
       print('  - M_ID: ${userId.runtimeType} = $userId');
 
-      final response = await http.post(
-        Uri.parse('https://tagai.caxis.ca/public/api/thnk-tracks'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: json.encode(payload),
+      final response = await _retryHttpRequest(
+        () => http.post(
+          Uri.parse('https://tagai.caxis.ca/public/api/thnk-tracks'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: json.encode(payload),
+        ),
       );
 
       print('DEBUG: _sendThankNote - API Status Code: ${response.statusCode}');
@@ -407,8 +530,10 @@ class _ReferencesPageState extends State<ReferencesPage>
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         print('SUCCESS: _sendThankNote - Thank note sent successfully');
-        _showSuccessSnackBar('Thank note sent successfully!');
-        await _fetchReferences();
+        if (mounted) {
+          _showSuccessSnackBar('Thank note sent successfully!');
+          await _fetchReferences();
+        }
       } else {
         print('ERROR: _sendThankNote - Failed to send thank note - Status: ${response.statusCode}');
         
@@ -433,15 +558,21 @@ class _ReferencesPageState extends State<ReferencesPage>
           print('DEBUG: _sendThankNote - Could not parse error response: $e');
         }
         
-        _showErrorSnackBar(errorMessage);
+        if (mounted) {
+          _showErrorSnackBar(errorMessage);
+        }
       }
     } catch (e) {
       print('ERROR: _sendThankNote - Exception while sending thank note: $e');
-      _showErrorSnackBar('Error sending thank note: $e');
+      if (mounted) {
+        _showErrorSnackBar('Error sending thank note: Network error. Please try again.');
+      }
     } finally {
-      setState(() {
-        _isSendingThankNote = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSendingThankNote = false;
+        });
+      }
     }
   }
 
@@ -606,9 +737,11 @@ class _ReferencesPageState extends State<ReferencesPage>
     _aboutController.clear();
     _emailController.clear();
     _phoneController.clear();
-    setState(() {
-      _selectedMemberId = null;
-    });
+    if (mounted) {
+      setState(() {
+        _selectedMemberId = null;
+      });
+    }
   }
 
   void _showErrorSnackBar(String message) {
@@ -651,7 +784,7 @@ class _ReferencesPageState extends State<ReferencesPage>
     if (_currentUserId == null) return [];
     
     return _references.where((reference) {
-      String fromMID = reference['From_MID'].toString();
+      String fromMID = reference['From_MID']?.toString() ?? '';
       String currentUID = _currentUserId.toString();
       return fromMID == currentUID;
     }).toList();
@@ -661,7 +794,7 @@ class _ReferencesPageState extends State<ReferencesPage>
     if (_currentUserId == null) return [];
     
     return _references.where((reference) {
-      String toMID = reference['To_MID'].toString();
+      String toMID = reference['To_MID']?.toString() ?? '';
       String currentUID = _currentUserId.toString();
       return toMID == currentUID;
     }).toList();
@@ -853,7 +986,7 @@ class _ReferencesPageState extends State<ReferencesPage>
   }
 
   Widget _buildReferenceCard(dynamic reference, {required bool isGiven}) {
-    String status = reference['Status'].toString();
+    String status = reference['Status']?.toString() ?? '0';
     Color statusColor;
     String statusText;
     IconData statusIcon;
@@ -928,7 +1061,7 @@ class _ReferencesPageState extends State<ReferencesPage>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        reference['Name'] ?? 'Unknown',
+                        reference['Name']?.toString() ?? 'Unknown',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -937,7 +1070,7 @@ class _ReferencesPageState extends State<ReferencesPage>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        reference['Email'] ?? '',
+                        reference['Email']?.toString() ?? '',
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: 14,
@@ -978,7 +1111,7 @@ class _ReferencesPageState extends State<ReferencesPage>
                 border: Border.all(color: Colors.grey[200]!),
               ),
               child: Text(
-                reference['About'] ?? '',
+                reference['About']?.toString() ?? '',
                 style: TextStyle(
                   color: Colors.grey[700],
                   fontSize: 14,
@@ -1003,7 +1136,7 @@ class _ReferencesPageState extends State<ReferencesPage>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  reference['Phone'] ?? '',
+                  reference['Phone']?.toString() ?? '',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 14,
@@ -1131,11 +1264,9 @@ class _ReferencesPageState extends State<ReferencesPage>
                   ),
                 ],
               ),
-              child: Column(
+              child: const Column(
                 children: [
-                 
-                  const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Send Reference',
                     style: TextStyle(
                       fontSize: 14,
@@ -1143,12 +1274,12 @@ class _ReferencesPageState extends State<ReferencesPage>
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text(
                     'Help someone by providing a reference',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[300],
+                      color: Colors.grey,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -1178,7 +1309,7 @@ class _ReferencesPageState extends State<ReferencesPage>
                   _buildSectionHeader('1', 'Select Member', Icons.people),
                   const SizedBox(height: 16),
                   
-                  // Member Selection Dropdown - FIXED VERSION
+                  // Member Selection Dropdown
                   _isMembersLoading
                     ? Container(
                         height: 60,
@@ -1244,13 +1375,13 @@ class _ReferencesPageState extends State<ReferencesPage>
                             ),
                           ),
                           isExpanded: true,
-                          itemHeight: 58, // Reduced from 70
+                          itemHeight: 58,
                           items: _members.isNotEmpty
                             ? _members.map<DropdownMenuItem<String>>((member) {
                                 return DropdownMenuItem<String>(
-                                  value: member['M_ID'].toString(),
+                                  value: member['M_ID']?.toString(),
                                   child: Container(
-                                    height: 50, // Fixed container height
+                                    height: 50,
                                     padding: const EdgeInsets.symmetric(vertical: 4),
                                     child: Row(
                                       children: [
@@ -1284,7 +1415,7 @@ class _ReferencesPageState extends State<ReferencesPage>
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,
                                               color: Colors.black87,
-                                              height: 1.0, // Remove extra line height
+                                              height: 1.0,
                                             ),
                                             overflow: TextOverflow.ellipsis,
                                             maxLines: 1,
@@ -1298,9 +1429,11 @@ class _ReferencesPageState extends State<ReferencesPage>
                             : null,
                           onChanged: _members.isNotEmpty
                             ? (String? value) {
-                                setState(() {
-                                  _selectedMemberId = value;
-                                });
+                                if (mounted) {
+                                  setState(() {
+                                    _selectedMemberId = value;
+                                  });
+                                }
                               }
                             : null,
                         ),

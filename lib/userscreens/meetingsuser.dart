@@ -4,22 +4,117 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
 
+// Data Models
+class Meeting {
+  final String mcId;
+  final String gId;
+  final String place;
+  final String groupLocation;
+  final String meetingCategory;
+  final String date;
+  final String createdAt;
+  final String attendanceStatus;
+  final Group? group;
+
+  Meeting({
+    required this.mcId,
+    required this.gId,
+    required this.place,
+    required this.groupLocation,
+    required this.meetingCategory,
+    required this.date,
+    required this.createdAt,
+    required this.attendanceStatus,
+    this.group,
+  });
+
+  factory Meeting.fromJson(Map<String, dynamic> json) {
+    return Meeting(
+      mcId: json['M_C_Id']?.toString() ?? '',
+      gId: json['G_ID']?.toString() ?? '',
+      place: json['Place']?.toString() ?? '',
+      groupLocation: json['G_Location']?.toString() ?? '',
+      meetingCategory: json['Meet_Cate']?.toString() ?? '',
+      date: json['Meeting_Date']?.toString() ?? '',
+      createdAt: json['created_at']?.toString() ?? '',
+      attendanceStatus: json['Attn_Status']?.toString() ?? '',
+      group: json['group'] != null ? Group.fromJson(json['group']) : null,
+    );
+  }
+}
+
+class Group {
+  final String name;
+
+  Group({required this.name});
+
+  factory Group.fromJson(Map<String, dynamic> json) {
+    return Group(name: json['name']?.toString() ?? '');
+  }
+}
+
+class Visitor {
+  final String mcId;
+  final String visitorName;
+  final String visitorEmail;
+  final String aboutVisitor;
+  final String visitorPhone;
+
+  Visitor({
+    required this.mcId,
+    required this.visitorName,
+    required this.visitorEmail,
+    required this.aboutVisitor,
+    required this.visitorPhone,
+  });
+
+  factory Visitor.fromJson(Map<String, dynamic> json) {
+    return Visitor(
+      mcId: json['M_C_Id']?.toString() ?? '',
+      visitorName: json['Visitor_Name']?.toString() ?? '',
+      visitorEmail: json['Visitor_Email']?.toString() ?? '',
+      aboutVisitor: json['About_Visitor']?.toString() ?? '',
+      visitorPhone: json['Visitor_Phone']?.toString() ?? '',
+    );
+  }
+}
+
+class Presentation {
+  final String mcId;
+  final String memberId;
+  final String presStatus;
+
+  Presentation({required this.mcId, required this.memberId, required this.presStatus});
+
+  factory Presentation.fromJson(Map<String, dynamic> json) {
+    return Presentation(
+      mcId: json['M_C_Id']?.toString() ?? '',
+      memberId: json['M_ID']?.toString() ?? '',
+      presStatus: json['Pres_Status']?.toString() ?? '',
+    );
+  }
+}
+
 // Function to save user data to SharedPreferences
 Future<void> saveUserData(Map<String, dynamic> userData) async {
   try {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     print('DEBUG: Saving userData: $userData');
-    await prefs.setString('user_email', userData['email']?.toString() ?? '');
-    await prefs.setInt('user_role', int.parse(userData['role_id'].toString()));
-    await prefs.setString('group_code', userData['Grop_code']?.toString() ?? '');
-    await prefs.setString('member_id', userData['M_ID']?.toString() ?? '');
-    print('DEBUG: Successfully saved user data - user_email: ${userData['email']}, user_role: ${userData['role_id']}, group_code: ${userData['Grop_code']}, member_id: ${userData['M_ID']?.toString() ?? ''}');
-    print('DEBUG: Verified member_id in SharedPreferences: ${prefs.getString('member_id')}');
+    await prefs.setString('M_ID', userData['M_ID']?.toString() ?? '');
+    await prefs.setString('Name', userData['Name']?.toString() ?? '');
+    await prefs.setString('email', userData['email']?.toString() ?? '');
+    await prefs.setString('number', userData['number']?.toString() ?? '');
+    await prefs.setString('Grop_code', userData['Grop_code']?.toString() ?? '');
+    await prefs.setString('G_ID', userData['G_ID']?.toString() ?? '');
+    await prefs.setString('role_id', userData['role_id']?.toString() ?? '');
+    print('DEBUG: Successfully saved user data - M_ID: ${userData['M_ID']}, Name: ${userData['Name']}, email: ${userData['email']}, number: ${userData['number']}, Grop_code: ${userData['Grop_code']}, G_ID: ${userData['G_ID']}, role_id: ${userData['role_id']}');
+    print('DEBUG: Verified M_ID in SharedPreferences: ${prefs.getString('M_ID')}');
   } catch (e) {
     print('DEBUG ERROR: Failed to save user data in SharedPreferences: $e');
   }
 }
 
+// Function to show presentation dialog
 Future<void> _showPresentationDialog(BuildContext context, Meeting meeting) async {
   try {
     print('DEBUG: Checking presentation slots for meeting M_C_Id: ${meeting.mcId}');
@@ -110,18 +205,19 @@ Future<void> _showPresentationDialog(BuildContext context, Meeting meeting) asyn
   }
 }
 
+// Function to submit presentation status
 Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, String presStatus) async {
   try {
     print('DEBUG: Submitting presentation status for M_C_Id: ${meeting.mcId}, Pres_Status: $presStatus');
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? memberId = prefs.getString('member_id');
-    String? groupCode = prefs.getString('group_code');
+    String? memberId = prefs.getString('M_ID');
+    String? groupId = prefs.getString('G_ID');
     String? token = prefs.getString('auth_token');
 
-    print('DEBUG: SharedPreferences state - member_id: $memberId, group_code: $groupCode, auth_token: $token');
+    print('DEBUG: SharedPreferences state - M_ID: $memberId, G_ID: $groupId, auth_token: $token');
 
     if (memberId == null || memberId.isEmpty) {
-      print('DEBUG ERROR: Missing or empty member_id in SharedPreferences for M_C_Id: ${meeting.mcId}');
+      print('DEBUG ERROR: Missing or empty M_ID in SharedPreferences for M_C_Id: ${meeting.mcId}');
       try {
         final userResponse = await http.get(
           Uri.parse('https://tagai.caxis.ca/public/api/user'),
@@ -136,8 +232,8 @@ Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, St
           final userData = json.decode(userResponse.body);
           memberId = userData['M_ID']?.toString();
           if (memberId != null && memberId.isNotEmpty) {
-            await prefs.setString('member_id', memberId);
-            print('DEBUG: Refreshed member_id from API: $memberId');
+            await prefs.setString('M_ID', memberId);
+            print('DEBUG: Refreshed M_ID from API: $memberId');
           } else {
             throw Exception('Invalid M_ID in user API response: $memberId');
           }
@@ -145,7 +241,7 @@ Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, St
           throw Exception('Failed to fetch user data: ${userResponse.statusCode} - ${userResponse.body}');
         }
       } catch (e) {
-        print('DEBUG ERROR: Failed to fetch member_id from API: $e');
+        print('DEBUG ERROR: Failed to fetch M_ID from API: $e');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -159,13 +255,13 @@ Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, St
       }
     }
 
-    print('DEBUG: Using member_id: $memberId for M_C_Id: ${meeting.mcId}, G_ID: ${meeting.gId}');
+    print('DEBUG: Using M_ID: $memberId for M_C_Id: ${meeting.mcId}, G_ID: ${meeting.gId}');
 
     final now = DateTime.now().toIso8601String();
     final payload = {
       'M_C_Id': meeting.mcId.toString(),
       'G_ID': meeting.gId,
-      'M_ID': memberId, // Changed from 'm_id' to 'M_ID' to match backend expectation
+      'M_ID': memberId,
       'Pres_Status': presStatus,
       'created_at': now,
       'updated_at': now,
@@ -214,6 +310,7 @@ Future<void> _submitPresentationStatus(BuildContext context, Meeting meeting, St
   }
 }
 
+// Meetings Page
 class MeetingsPage extends StatefulWidget {
   const MeetingsPage({Key? key}) : super(key: key);
 
@@ -228,7 +325,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
   String selectedFilter = 'All';
   bool isLoading = true;
   bool isRefreshing = false;
-  String userGroupCode = '';
+  String userGroupId = '';
   String userId = '';
   String userName = '';
 
@@ -252,15 +349,15 @@ class _MeetingsPageState extends State<MeetingsPage> {
     try {
       print('DEBUG: Loading user data from SharedPreferences');
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? groupCode = prefs.getString('group_code');
-      String? uId = prefs.getString('member_id');
-      String? uName = prefs.getString('user_name');
+      String? groupId = prefs.getString('G_ID');
+      String? uId = prefs.getString('M_ID');
+      String? uName = prefs.getString('Name');
 
-      print('DEBUG: Retrieved group_code: $groupCode, member_id: $uId, user_name: $uName');
+      print('DEBUG: Retrieved G_ID: $groupId, M_ID: $uId, Name: $uName');
 
-      if (groupCode != null && groupCode.isNotEmpty) {
+      if (groupId != null && groupId.isNotEmpty) {
         setState(() {
-          userGroupCode = groupCode;
+          userGroupId = groupId;
           userId = uId ?? '';
           userName = uName ?? '';
         });
@@ -269,8 +366,8 @@ class _MeetingsPageState extends State<MeetingsPage> {
         setState(() {
           isLoading = false;
         });
-        showErrorMessage('Group code not found. Please login again.');
-        print('DEBUG ERROR: Group code not found in SharedPreferences');
+        showErrorMessage('Group ID not found. Please login again.');
+        print('DEBUG ERROR: G_ID not found in SharedPreferences');
       }
     } catch (e) {
       print('DEBUG ERROR: Error loading user data: $e');
@@ -306,12 +403,14 @@ class _MeetingsPageState extends State<MeetingsPage> {
 
         List<Meeting> meetings = [];
         for (var item in data) {
+          print('DEBUG: Raw meeting JSON: $item');
           Meeting meeting = Meeting.fromJson(item as Map<String, dynamic>);
-          if (meeting.group?.gropCode == userGroupCode && meeting.meetingCategory.toLowerCase() == 'general') {
+          print('DEBUG: Processing meeting - M_C_Id: ${meeting.mcId}, G_ID: ${meeting.gId}, Meet_Cate: ${meeting.meetingCategory}');
+          if (meeting.gId == userGroupId && meeting.meetingCategory.toLowerCase() == 'general') {
             meetings.add(meeting);
           }
         }
-        print('DEBUG: Filtered ${meetings.length} general meetings for group code: $userGroupCode');
+        print('DEBUG: Filtered ${meetings.length} general meetings for group ID: $userGroupId');
 
         meetings.sort((a, b) {
           DateTime now = DateTime.now();
@@ -641,6 +740,7 @@ class _MeetingsPageState extends State<MeetingsPage> {
   }
 }
 
+// Meeting Card Widget
 class MeetingCard extends StatelessWidget {
   final Meeting meeting;
 
@@ -650,7 +750,7 @@ class MeetingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     DateTime meetingDate = DateTime.parse(meeting.date);
     DateTime now = DateTime.now();
-    bool isToday = meetingDate.year == now.year && meetingDate.month == now.month && meetingDate.day == now.day;
+    bool isToday = isSameDay(meetingDate, now);
     bool isPast = meetingDate.isBefore(now) && !isToday;
     bool isUpcoming = meetingDate.isAfter(now);
 
@@ -895,20 +995,19 @@ class MeetingCard extends StatelessWidget {
                     color: Colors.black,
                   ),
                   overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (subtitle != null) ...[
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                  ),
+                  overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 1),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[600],
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ],
               ],
             ],
           ),
@@ -960,16 +1059,44 @@ class MeetingCard extends StatelessWidget {
       ),
     );
   }
+
+  String formatDate(DateTime date) {
+    const List<String> months = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC'
+    ];
+    const List<String> weekdays = [
+      'MON',
+      'TUE',
+      'WED',
+      'THU',
+      'FRI',
+      'SAT',
+      'SUN'
+    ];
+    String weekday = weekdays[date.weekday - 1];
+    String month = months[date.month - 1];
+    return '$weekday, ${date.day} $month ${date.year}';
+  }
+
+  bool isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
+  }
 }
 
-String formatDate(DateTime date) {
-  const List<String> months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-  const List<String> weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-  String weekday = weekdays[date.weekday - 1];
-  String month = months[date.month - 1];
-  return '$weekday, ${date.day} $month ${date.year}';
-}
-
+// Meeting Details Page
 class MeetingDetailsPage extends StatefulWidget {
   final Meeting meeting;
 
@@ -1012,16 +1139,15 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
             .where((visitor) => visitor.mcId == widget.meeting.mcId)
             .toList();
 
-        fetchedVisitors.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        fetchedVisitors.sort((a, b) => a.visitorName.toLowerCase().compareTo(b.visitorName.toLowerCase()));
 
         if (mounted) {
           setState(() {
             visitors = fetchedVisitors;
             isLoadingVisitors = false;
           });
+          print('DEBUG: Filtered ${visitors.length} visitors for M_C_Id ${widget.meeting.mcId}');
         }
-
-        print('DEBUG: Filtered ${visitors.length} visitors for M_C_Id ${widget.meeting.mcId}');
       } else {
         print('DEBUG ERROR: Failed to load visitors: Status Code ${response.statusCode}, Response Body: ${response.body}');
         throw Exception('Failed to load visitors: ${response.statusCode}');
@@ -1033,6 +1159,13 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
           isLoadingVisitors = false;
           hasVisitorError = true;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading visitors: ${e.toString()}'),
+            backgroundColor: Colors.black,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     }
   }
@@ -1051,20 +1184,17 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
         List<dynamic> presentationData = data is List ? data : data['data'] ?? [];
 
         List<Presentation> fetchedPresentations = presentationData
-            .map((item) => Presentation.fromJson(item as Map<String, dynamic>))
+            .map((item) => Presentation.fromJson(item))
             .where((presentation) => presentation.mcId == widget.meeting.mcId)
             .toList();
-
-        fetchedPresentations.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
         if (mounted) {
           setState(() {
             presentations = fetchedPresentations;
             isLoadingPresentations = false;
           });
+          print('DEBUG: Filtered ${presentations.length} presentations for M_C_Id ${widget.meeting.mcId}');
         }
-
-        print('DEBUG: Filtered ${presentations.length} presentations for M_C_Id ${widget.meeting.mcId}');
       } else {
         print('DEBUG ERROR: Failed to load presentations: Status Code ${response.statusCode}, Response Body: ${response.body}');
         throw Exception('Failed to load presentations: ${response.statusCode}');
@@ -1076,20 +1206,20 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
           isLoadingPresentations = false;
           hasPresentationError = true;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading presentations: ${e.toString()}'),
+            backgroundColor: Colors.black,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    DateTime meetingDate = DateTime.parse(widget.meeting.date);
-    bool isToday = meetingDate.year == DateTime.now().year &&
-        meetingDate.month == DateTime.now().month &&
-        meetingDate.day == DateTime.now().day;
-    bool isUpcoming = meetingDate.isAfter(DateTime.now());
-
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
@@ -1109,453 +1239,157 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> {
           ),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: Colors.grey[300],
-          ),
-        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.black, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'MEETING INFORMATION',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildDetailRow(
-                    icon: Icons.calendar_today_outlined,
-                    label: 'DATE',
-                    value: formatDate(meetingDate),
-                  ),
-                  const SizedBox(height: 14),
-                  _buildDetailRow(
-                    icon: Icons.location_on_outlined,
-                    label: 'LOCATION',
-                    value: '${widget.meeting.place}${widget.meeting.groupLocation.isNotEmpty ? '\n${widget.meeting.groupLocation}' : ''}',
-                  ),
-                  const SizedBox(height: 14),
-                  _buildDetailRow(
-                    icon: Icons.category_outlined,
-                    label: 'CATEGORY',
-                    value: widget.meeting.meetingCategory.toUpperCase(),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'VISITORS',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 12),
-            isLoadingVisitors
-                ? const Center(child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2.5))
-                : hasVisitorError
-                    ? Center(
-                        child: Column(
-                          children: [
-                            Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Failed to load visitors',
-                              style: TextStyle(fontSize: 16, color: Colors.black54),
-                            ),
-                          ],
-                        ),
-                      )
-                    : visitors.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No visitors registered for this meeting',
-                              style: TextStyle(fontSize: 14, color: Colors.black54),
-                            ),
-                          )
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: visitors.length,
-                            itemBuilder: (context, index) {
-                              return _buildVisitorCard(visitors[index]);
-                            },
-                          ),
-            const SizedBox(height: 24),
-            const Text(
-              'PRESENTATIONS',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 12),
-            isLoadingPresentations
-                ? const Center(child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2.5))
-                : hasPresentationError
-                    ? Center(
-                        child: Column(
-                          children: [
-                            Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Failed to load presentations',
-                              style: TextStyle(fontSize: 16, color: Colors.black54),
-                            ),
-                          ],
-                        ),
-                      )
-                    : presentations.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No presentations registered for this meeting',
-                              style: TextStyle(fontSize: 14, color: Colors.black54),
-                            ),
-                          )
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: presentations.length,
-                            itemBuilder: (context, index) {
-                              return _buildPresentationCard(presentations[index]);
-                            },
-                          ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddVisitorPage(meeting: widget.meeting),
-                          ),
-                        );
-                        print('DEBUG: Navigating to AddVisitorPage from MeetingDetailsPage for M_C_Id: ${widget.meeting.mcId}');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          side: const BorderSide(color: Colors.black, width: 1.5),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.person_add_outlined, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            'ADD VISITOR',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _showPresentationDialog(context, widget.meeting);
-                        print('DEBUG: Opening presentation dialog from MeetingDetailsPage for M_C_Id: ${widget.meeting.mcId}');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.present_to_all_outlined, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            'PRESENTATION',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[300]!, width: 0.5),
-          ),
-          child: Icon(icon, color: Colors.black, size: 16),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                label,
+                formatDate(DateTime.parse(widget.meeting.date)),
                 style: const TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey,
+                  fontSize: 24,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
                   color: Colors.black,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                widget.meeting.place,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+              if (widget.meeting.groupLocation.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  widget.meeting.groupLocation,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Text(
+                'Status: ${widget.meeting.attendanceStatus == '1' ? 'Active' : 'Inactive'}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: widget.meeting.attendanceStatus == '1' ? Colors.black : Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Visitors',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              isLoadingVisitors
+                  ? const Center(child: CircularProgressIndicator(color: Colors.black))
+                  : hasVisitorError
+                      ? const Text(
+                          'Failed to load visitors',
+                          style: TextStyle(color: Colors.red),
+                        )
+                      : visitors.isEmpty
+                          ? const Text('No visitors found')
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: visitors.length,
+                              itemBuilder: (context, index) {
+                                return ListTile(
+                                  title: Text(visitors[index].visitorName),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(visitors[index].visitorEmail),
+                                      if (visitors[index].aboutVisitor.isNotEmpty)
+                                        Text('About: ${visitors[index].aboutVisitor}'),
+                                      if (visitors[index].visitorPhone.isNotEmpty)
+                                        Text('Phone: ${visitors[index].visitorPhone}'),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+              const SizedBox(height: 16),
+              const Text(
+                'Presentations',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              isLoadingPresentations
+                  ? const Center(child: CircularProgressIndicator(color: Colors.black))
+                  : hasPresentationError
+                      ? const Text(
+                          'Failed to load presentations',
+                          style: TextStyle(color: Colors.red),
+                        )
+                      : presentations.isEmpty
+                          ? const Text('No presentations found')
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: presentations.length,
+                              itemBuilder: (context, index) {
+                                return ListTile(
+                                  title: Text('Member ID: ${presentations[index].memberId}'),
+                                  subtitle: Text(
+                                      'Status: ${presentations[index].presStatus == '0' ? 'Presenting' : 'Not Presenting'}'),
+                                );
+                              },
+                            ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildVisitorCard(Visitor visitor) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.black, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.person, color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  visitor.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            visitor.about,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              height: 1.3,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.email_outlined, color: Colors.grey[600], size: 14),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  visitor.email,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(Icons.phone_outlined, color: Colors.grey[600], size: 14),
-              const SizedBox(width: 6),
-              Text(
-                visitor.phone,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildPresentationCard(Presentation presentation) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.black, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.present_to_all, color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  presentation.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.email_outlined, color: Colors.grey[600], size: 14),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  presentation.email,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(Icons.phone_outlined, color: Colors.grey[600], size: 14),
-              const SizedBox(width: 6),
-              Text(
-                presentation.number,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  String formatDate(DateTime date) {
+    const List<String> months = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC'
+    ];
+    const List<String> weekdays = [
+      'MON',
+      'TUE',
+      'WED',
+      'THU',
+      'FRI',
+      'SAT',
+      'SUN'
+    ];
+    String weekday = weekdays[date.weekday - 1];
+    String month = months[date.month - 1];
+    return '$weekday, ${date.day} $month ${date.year}';
   }
 }
 
+// Add Visitor Page
 class AddVisitorPage extends StatefulWidget {
   final Meeting meeting;
 
@@ -1566,34 +1400,30 @@ class AddVisitorPage extends StatefulWidget {
 }
 
 class _AddVisitorPageState extends State<AddVisitorPage> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _aboutController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController visitorNameController = TextEditingController();
+  final TextEditingController visitorEmailController = TextEditingController();
+  final TextEditingController aboutVisitorController = TextEditingController();
+  final TextEditingController visitorPhoneController = TextEditingController();
   bool isLoading = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _aboutController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
+    visitorNameController.dispose();
+    visitorEmailController.dispose();
+    aboutVisitorController.dispose();
+    visitorPhoneController.dispose();
     super.dispose();
   }
 
-  Future<void> submitVisitor() async {
-    if (_nameController.text.isEmpty ||
-        _aboutController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _phoneController.text.isEmpty) {
+  Future<void> addVisitor() async {
+    if (visitorNameController.text.isEmpty || visitorEmailController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill in all fields'),
+          content: Text('Please fill in Visitor Name and Visitor Email fields'),
           backgroundColor: Colors.black,
           duration: Duration(seconds: 3),
         ),
       );
-      print('DEBUG ERROR: Validation failed - all fields are required');
       return;
     }
 
@@ -1602,40 +1432,82 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
     });
 
     try {
-      print('DEBUG: Submitting visitor for M_C_Id: ${widget.meeting.mcId}');
+      print('DEBUG: Adding visitor for M_C_Id: ${widget.meeting.mcId}');
       SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? groupCode = prefs.getString('group_code');
-      String? memberId = prefs.getString('member_id');
+      String? token = prefs.getString('auth_token');
+      String? memberId = prefs.getString('M_ID');
 
-      print('DEBUG: Retrieved group_code: $groupCode, member_id: $memberId');
-
-      if (groupCode == null || memberId == null) {
-        print('DEBUG ERROR: Missing group_code or member_id for M_C_Id: ${widget.meeting.mcId}');
-        throw Exception('Missing group_code or member_id');
+      if (memberId == null || memberId.isEmpty) {
+        print('DEBUG ERROR: Missing or empty M_ID in SharedPreferences for M_C_Id: ${widget.meeting.mcId}');
+        try {
+          final userResponse = await http.get(
+            Uri.parse('https://tagai.caxis.ca/public/api/user'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
+          ).timeout(const Duration(seconds: 15));
+          print('DEBUG: User API response - Status Code: ${userResponse.statusCode}, Body: ${userResponse.body}');
+          if (userResponse.statusCode == 200) {
+            final userData = json.decode(userResponse.body);
+            memberId = userData['M_ID']?.toString();
+            if (memberId != null && memberId.isNotEmpty) {
+              await prefs.setString('M_ID', memberId);
+              print('DEBUG: Refreshed M_ID from API: $memberId');
+            } else {
+              throw Exception('Invalid M_ID in user API response: $memberId');
+            }
+          } else {
+            throw Exception('Failed to fetch user data: ${userResponse.statusCode} - ${userResponse.body}');
+          }
+        } catch (e) {
+          print('DEBUG ERROR: Failed to fetch M_ID from API: $e');
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('User ID is missing or invalid. Please log out and log in again.'),
+                backgroundColor: Colors.black,
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
+          setState(() {
+            isLoading = false;
+          });
+          return;
+        }
       }
 
+      final now = DateTime.now().toIso8601String();
       final payload = {
-        'Visitor_Name': _nameController.text.trim(),
-        'About_Visitor': _aboutController.text.trim(),
-        'Visitor_Email': _emailController.text.trim(),
-        'Visitor_Phone': _phoneController.text.trim(),
         'M_C_Id': widget.meeting.mcId,
         'G_ID': widget.meeting.gId,
-        'M_ID': memberId, // Changed to match backend expectation
+        'M_ID': memberId,
+        'Visitor_Name': visitorNameController.text,
+        'Visitor_Email': visitorEmailController.text,
+        'About_Visitor': aboutVisitorController.text,
+        'Visitor_Phone': visitorPhoneController.text,
+        'created_at': now,
+        'updated_at': now,
       };
 
-      print('DEBUG: Submitting visitor with payload: ${json.encode(payload)}');
+      print('DEBUG: Visitor payload: ${json.encode(payload)}');
 
       final response = await http.post(
         Uri.parse('https://tagai.caxis.ca/public/api/visitor-invites'),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
         body: json.encode(payload),
       ).timeout(const Duration(seconds: 30));
 
-      print('DEBUG: Visitor submission response - Status Code: ${response.statusCode}, Body: ${response.body}');
+      print('DEBUG: Add visitor response - Status Code: ${response.statusCode}, Body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        if (mounted) {
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Visitor added successfully'),
@@ -1645,14 +1517,13 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
           );
           Navigator.pop(context);
         }
-        print('DEBUG: Visitor added successfully for M_C_Id: ${widget.meeting.mcId}, Status Code: ${response.statusCode}');
       } else {
         print('DEBUG ERROR: Failed to add visitor: Status Code ${response.statusCode}, Response Body: ${response.body}');
         throw Exception('Failed to add visitor: ${response.statusCode}');
       }
     } catch (e) {
-      print('DEBUG ERROR: Error adding visitor for M_C_Id: ${widget.meeting.mcId}: $e');
-      if (mounted) {
+      print('DEBUG ERROR: Error adding visitor for M_C_Id ${widget.meeting.mcId}: $e');
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error adding visitor: ${e.toString()}'),
@@ -1673,7 +1544,6 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
@@ -1693,289 +1563,235 @@ class _AddVisitorPageState extends State<AddVisitorPage> {
           ),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: Colors.grey[300],
-          ),
-        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'VISITOR DETAILS',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-                letterSpacing: 0.8,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              TextField(
+                controller: visitorNameController,
+                decoration: InputDecoration(
+                  labelText: 'Visitor Name',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            _buildTextField(
-              controller: _nameController,
-              label: 'VISITOR NAME',
-              hint: 'Enter visitor name',
-              icon: Icons.person_outlined,
-            ),
-            const SizedBox(height: 14),
-            _buildTextField(
-              controller: _aboutController,
-              label: 'ABOUT VISITOR',
-              hint: 'Enter details about the visitor',
-              icon: Icons.info_outlined,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 14),
-            _buildTextField(
-              controller: _emailController,
-              label: 'VISITOR EMAIL',
-              hint: 'Enter visitor email',
-              icon: Icons.email_outlined,
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 14),
-            _buildTextField(
-              controller: _phoneController,
-              label: 'VISITOR PHONE',
-              hint: 'Enter visitor phone number',
-              icon: Icons.phone_outlined,
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: isLoading ? null : submitVisitor,
+              const SizedBox(height: 16),
+              TextField(
+                controller: visitorEmailController,
+                decoration: InputDecoration(
+                  labelText: 'Visitor Email',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: aboutVisitorController,
+                decoration: InputDecoration(
+                  labelText: 'About Visitor',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: visitorPhoneController,
+                decoration: InputDecoration(
+                  labelText: 'Visitor Phone',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: isLoading ? null : addVisitor,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.black,
                   foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  minimumSize: const Size(double.infinity, 50),
                 ),
                 child: isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
+                    ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
-                        'SUBMIT',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                        ),
+                        'Add Visitor',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                       ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Login Page
+class LoginPage extends StatefulWidget {
+  const LoginPage({Key? key}) : super(key: key);
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  bool isLoading = false;
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> login() async {
+    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all fields'),
+          backgroundColor: Colors.black,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      print('DEBUG: Attempting login with email: ${emailController.text}');
+      final response = await http.post(
+        Uri.parse('https://tagai.caxis.ca/public/api/login'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode({
+          'email': emailController.text,
+          'password': passwordController.text,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      print('DEBUG: Login response - Status Code: ${response.statusCode}, Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        String? token = data['token'];
+        Map<String, dynamic> userData = data['user'] ?? {};
+
+        if (token != null && userData.isNotEmpty) {
+          await saveUserData(userData);
+          SharedPreferences prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', token);
+          print('DEBUG: Login successful, token saved: $token, userData: $userData');
+
+          if (context.mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const MeetingsPage()),
+            );
+          }
+        } else {
+          throw Exception('Invalid login response: Missing token or user data');
+        }
+      } else {
+        print('DEBUG ERROR: Login failed: Status Code ${response.statusCode}, Response Body: ${response.body}');
+        throw Exception('Login failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('DEBUG ERROR: Error during login: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Login failed: ${e.toString()}'),
+            backgroundColor: Colors.black,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        title: const Text(
+          'Login',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              obscureText: true,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: isLoading ? null : login,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text(
+                      'Login',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    int maxLines = 1,
-    TextInputType? keyboardType,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: controller.text.isNotEmpty ? Colors.black : Colors.grey[300]!,
-          width: controller.text.isNotEmpty ? 1.5 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: const TextStyle(
-            fontSize: 11,
-            color: Colors.grey,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
-          ),
-          hintText: hint,
-          hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-          prefixIcon: Icon(icon, color: Colors.grey[600], size: 18),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        ),
-        style: const TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.w500),
-        onChanged: (value) => setState(() {}),
-      ),
-    );
-  }
-}
-
-class Visitor {
-  final String name;
-  final String about;
-  final String email;
-  final String phone;
-  final int? mcId;
-
-  Visitor({
-    required this.name,
-    required this.about,
-    required this.email,
-    required this.phone,
-    this.mcId,
-  });
-
-  factory Visitor.fromJson(Map<String, dynamic> json) {
-    return Visitor(
-      name: json['Visitor_Name']?.toString() ?? '',
-      about: json['About_Visitor']?.toString() ?? '',
-      email: json['Visitor_Email']?.toString() ?? '',
-      phone: json['Visitor_Phone']?.toString() ?? '',
-      mcId: json['M_C_Id'] != null ? int.tryParse(json['M_C_Id'].toString()) : null,
-    );
-  }
-}
-
-class Presentation {
-  final int presTrackId;
-  final int? mcId;
-  final String? mId;
-  final String name;
-  final String email;
-  final String number;
-
-  Presentation({
-    required this.presTrackId,
-    this.mcId,
-    this.mId,
-    required this.name,
-    required this.email,
-    required this.number,
-  });
-
-  factory Presentation.fromJson(Map<String, dynamic> json) {
-    return Presentation(
-      presTrackId: json['pres_track_id'] != null ? int.parse(json['pres_track_id'].toString()) : 0,
-      mcId: json['M_C_Id'] != null ? int.tryParse(json['M_C_Id'].toString()) : null,
-      mId: json['M_ID']?.toString(),
-      name: json['member'] != null ? json['member']['Name']?.toString() ?? 'Unknown' : 'Unknown',
-      email: json['member'] != null ? json['member']['email']?.toString() ?? '' : '',
-      number: json['member'] != null ? json['member']['number']?.toString() ?? '' : '',
-    );
-  }
-}
-
-class Meeting {
-  final int mcId;
-  final String date;
-  final String place;
-  final String groupLocation;
-  final String attendanceStatus;
-  final String meetingCategory;
-  final String? image;
-  final String gId;
-  final String? mId;
-  final String createdAt;
-  final String updatedAt;
-  final Group? group;
-
-  Meeting({
-    required this.mcId,
-    required this.date,
-    required this.place,
-    required this.groupLocation,
-    required this.attendanceStatus,
-    required this.meetingCategory,
-    this.image,
-    required this.gId,
-    this.mId,
-    required this.createdAt,
-    required this.updatedAt,
-    this.group,
-  });
-
-  factory Meeting.fromJson(Map<String, dynamic> json) {
-    return Meeting(
-      mcId: json['M_C_Id'] != null ? int.parse(json['M_C_Id'].toString()) : 0,
-      date: json['Meeting_Date']?.toString() ?? '',
-      place: json['Place']?.toString() ?? '',
-      groupLocation: json['G_Location']?.toString() ?? '',
-      attendanceStatus: json['Attn_Status']?.toString() ?? '0',
-      meetingCategory: json['Meet_Cate']?.toString() ?? '',
-      image: json['Image']?.toString(),
-      gId: json['G_ID']?.toString() ?? '0',
-      mId: json['M_ID']?.toString(),
-      createdAt: json['created_at']?.toString() ?? '',
-      updatedAt: json['updated_at']?.toString() ?? '',
-      group: json['group'] != null ? Group.fromJson(json['group']) : null,
-    );
-  }
-}
-
-class Group {
-  final int gId;
-  final String name;
-  final String shortGroupName;
-  final String groupName;
-  final String email;
-  final String number;
-  final String gropCode;
-  final String panNum;
-  final String roleId;
-  final String status;
-  final String createdAt;
-  final String updatedAt;
-
-  Group({
-    required this.gId,
-    required this.name,
-    required this.shortGroupName,
-    required this.groupName,
-    required this.email,
-    required this.number,
-    required this.gropCode,
-    required this.panNum,
-    required this.roleId,
-    required this.status,
-    required this.createdAt,
-    required this.updatedAt,
-  });
-
-  factory Group.fromJson(Map<String, dynamic> json) {
-    return Group(
-      gId: json['G_ID'] != null ? int.parse(json['G_ID'].toString()) : 0,
-      name: json['name']?.toString() ?? '',
-      shortGroupName: json['short_group_name']?.toString() ?? '',
-      groupName: json['group_name']?.toString() ?? '',
-      email: json['email']?.toString() ?? '',
-      number: json['number']?.toString() ?? '',
-      gropCode: json['Grop_code']?.toString() ?? '',
-      panNum: json['pan_num']?.toString() ?? '',
-      roleId: json['role_id']?.toString() ?? '0',
-      status: json['status']?.toString() ?? '0',
-      createdAt: json['created_at']?.toString() ?? '',
-      updatedAt: json['updated_at']?.toString() ?? '',
     );
   }
 }

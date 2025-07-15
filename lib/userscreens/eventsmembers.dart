@@ -4,6 +4,44 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+// Placeholder login function to save user data
+Future<bool> loginUser(Map<String, dynamic> userData) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Store user data in SharedPreferences with new keys
+    await prefs.setString('M_ID', userData['M_ID'].toString());
+    await prefs.setString('Name', userData['Name'] ?? '');
+    await prefs.setString('email', userData['email'] ?? '');
+    await prefs.setString('number', userData['number'] ?? '');
+    await prefs.setString('Grop_code', userData['Grop_code'] ?? '');
+    await prefs.setString('G_ID', userData['G_ID'].toString());
+    await prefs.setString('role_id', userData['role_id'].toString());
+
+    // Migrate old member_id to M_ID if it exists
+    final oldMemberId = prefs.getString('member_id');
+    if (oldMemberId != null && oldMemberId.isNotEmpty) {
+      await prefs.setString('M_ID', oldMemberId);
+      await prefs.remove('member_id'); // Clean up old key
+      print('Migrated member_id to M_ID: $oldMemberId');
+    }
+
+    // Migrate old group_code to Grop_code if it exists
+    final oldGroupCode = prefs.getString('group_code');
+    if (oldGroupCode != null && oldGroupCode.isNotEmpty) {
+      await prefs.setString('Grop_code', oldGroupCode);
+      await prefs.remove('group_code'); // Clean up old key
+      print('Migrated group_code to Grop_code: $oldGroupCode');
+    }
+
+    print('User data saved to SharedPreferences');
+    return true;
+  } catch (e) {
+    print('Error saving user data to SharedPreferences: $e');
+    return false;
+  }
+}
+
 // Event Model with booking status
 class Event {
   final int id;
@@ -53,31 +91,36 @@ class Event {
 // API Service with booking status management
 class ApiService {
   static const String baseUrl = 'https://tagai.caxis.ca/public/api';
-  static final client = http.Client(); // Use Client to handle redirects
 
   static Future<void> initializePreferences() async {
     final prefs = await SharedPreferences.getInstance();
-    final groupCode = prefs.getString('group_code');
-    print('initializePreferences: group_code = $groupCode');
+    String? groupCode = prefs.getString('Grop_code'); // Check new key first
+    print('initializePreferences: Grop_code = $groupCode');
 
+    // Backward compatibility: Check old keys if Grop_code is not found
     if (groupCode == null || groupCode.isEmpty) {
-      final possibleKeys = ['group_code', 'GroupCode', 'GROUP_CODE', 'Grop_code'];
+      final possibleKeys = ['group_code', 'GroupCode', 'GROUP_CODE'];
       for (var key in possibleKeys) {
         final value = prefs.getString(key);
         if (value != null && value.isNotEmpty) {
-          await prefs.setString('group_code', value);
-          print('Found group_code under key $key: $value. Set to group_code.');
-          return;
+          groupCode = value;
+          await prefs.setString('Grop_code', value); // Migrate to new key
+          print('Found group code under old key $key: $value. Migrated to Grop_code.');
+          break;
         }
       }
-      await prefs.setString('group_code', '572334');
-      print('No group_code found. Set default: 572334');
+      // Set default if no group code is found
+      if (groupCode == null || groupCode.isEmpty) {
+        groupCode = '572334';
+        await prefs.setString('Grop_code', groupCode);
+        print('No group code found. Set default Grop_code: $groupCode');
+      }
     }
   }
 
   static Future<List<Event>> fetchEvents() async {
     try {
-      final response = await client.get(
+      final response = await http.get(
         Uri.parse('$baseUrl/event-cals'),
         headers: {'Content-Type': 'application/json'},
       );
@@ -124,8 +167,8 @@ class ApiService {
   static Future<List<Event>> fetchFilteredEvents() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final groupCode = prefs.getString('group_code') ?? '';
-      print('fetchFilteredEvents: group_code = $groupCode');
+      final groupCode = prefs.getString('Grop_code') ?? '';
+      print('fetchFilteredEvents: Grop_code = $groupCode');
 
       if (groupCode.isEmpty) {
         final allKeys = prefs.getKeys();
@@ -133,7 +176,7 @@ class ApiService {
         for (var key in allKeys) {
           print('Key $key: ${prefs.get(key)}');
         }
-        throw Exception('Group code not found in preferences');
+        throw Exception('Group code (Grop_code) not found in preferences');
       }
 
       final allEvents = await fetchEvents();
@@ -148,7 +191,7 @@ class ApiService {
 
   static Future<List<Event>> fetchBookedEvents(int mId) async {
     try {
-      final response = await client.get(
+      final response = await http.get(
         Uri.parse('$baseUrl/event-tracks?M_ID=$mId&status=1'),
         headers: {'Content-Type': 'application/json'},
       );
@@ -166,7 +209,8 @@ class ApiService {
                   (e) => e.evCalId == int.tryParse(track['Ev_Cal_Id'].toString()),
                   orElse: () => null as Event,
                 ))
-            .whereType<Event>()
+            .where((e) => e != null)
+            .cast<Event>()
             .toList();
 
         print('Parsed Booked Events: $bookedEvents');
@@ -195,8 +239,7 @@ class ApiService {
 
       print('saveEventResponse Request body: $requestBody');
 
-      // Follow redirects manually if needed
-      final response = await client.post(
+      final response = await http.post(
         Uri.parse('$baseUrl/event-tracks'),
         headers: {'Content-Type': 'application/json'},
         body: requestBody,
@@ -223,11 +266,6 @@ class ApiService {
       print('Error saving event response: $e');
       return false;
     }
-  }
-
-  // Clean up the client when done
-  static void dispose() {
-    client.close();
   }
 }
 
@@ -274,7 +312,6 @@ class _EventsPageState extends State<EventsPage> {
 
   @override
   void dispose() {
-    ApiService.dispose();
     super.dispose();
   }
 
@@ -605,11 +642,11 @@ class _BookedEventsPageState extends State<BookedEventsPage> {
       });
 
       final prefs = await SharedPreferences.getInstance();
-      final memberIdString = prefs.getString('member_id');
+      final memberIdString = prefs.getString('M_ID');
       final mId = int.tryParse(memberIdString ?? '') ?? 0;
 
       if (mId == 0) {
-        throw Exception('Member ID (member_id) not found in preferences. Please log in again.');
+        throw Exception('Member ID (M_ID) not found in preferences. Please log in again.');
       }
 
       final fetchedEvents = await ApiService.fetchBookedEvents(mId);
@@ -628,7 +665,6 @@ class _BookedEventsPageState extends State<BookedEventsPage> {
 
   @override
   void dispose() {
-    ApiService.dispose();
     super.dispose();
   }
 
@@ -981,9 +1017,7 @@ class EventCard extends StatelessWidget {
                         ),
                       ),
                     ),
-
                     const Spacer(),
-
                     // Event Mode badge - positioned at right corner, more highlighted
                     Container(
                       constraints: BoxConstraints(
@@ -992,14 +1026,14 @@ class EventCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: eventModeStyle['colors'],
+                          colors: eventModeStyle['colors'] as List<Color>,
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: eventModeStyle['colors'][0].withOpacity(0.4),
+                            color: (eventModeStyle['colors'] as List<Color>)[0].withOpacity(0.4),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                             spreadRadius: 1,
@@ -1020,7 +1054,7 @@ class EventCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
-                              eventModeStyle['icon'],
+                              eventModeStyle['icon'] as IconData,
                               color: Colors.white,
                               size: 14,
                             ),
@@ -1050,9 +1084,7 @@ class EventCard extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 // Booking status indicator - if exists
                 if (event.bookingStatus != null) ...[
                   Align(
@@ -1099,7 +1131,6 @@ class EventCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                 ],
-
                 // Event title - smaller font
                 Text(
                   event.title,
@@ -1112,9 +1143,7 @@ class EventCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-
                 const SizedBox(height: 8),
-
                 // Event description - smaller and fewer lines
                 Text(
                   event.description,
@@ -1126,9 +1155,7 @@ class EventCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-
                 const SizedBox(height: 12),
-
                 // Time and location info - more compact
                 Row(
                   children: [
@@ -1201,9 +1228,7 @@ class EventCard extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 // "Tap for details" text at the bottom
                 Center(
                   child: Container(
@@ -1270,7 +1295,6 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
   @override
   void dispose() {
     _animationController.dispose();
-    ApiService.dispose();
     super.dispose();
   }
 
@@ -1335,16 +1359,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
         print('Key $key: ${prefs.get(key)} (Type: ${prefs.get(key).runtimeType})');
       }
 
-      final memberIdString = prefs.getString('member_id');
+      final memberIdString = prefs.getString('M_ID');
       int mId = 0;
       if (memberIdString != null && memberIdString.isNotEmpty) {
         mId = int.tryParse(memberIdString) ?? 0;
-        print('Retrieved member_id: $memberIdString, Parsed to int: $mId');
+        print('Retrieved M_ID: $memberIdString, Parsed to int: $mId');
       }
       print('Member ID: $mId');
 
       if (mId == 0) {
-        throw Exception('Member ID (member_id) not found in preferences. Please log in again.');
+        throw Exception('Member ID (M_ID) not found in preferences. Please log in again.');
       }
 
       final success = await ApiService.saveEventResponse(
@@ -1563,7 +1587,6 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                     ),
                                   ),
                                 ),
-
                                 Container(
                                   constraints: BoxConstraints(
                                     maxWidth: MediaQuery.of(context).size.width * 0.5,
@@ -1571,14 +1594,14 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
-                                      colors: eventModeStyle['colors'],
+                                      colors: eventModeStyle['colors'] as List<Color>,
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
                                     borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: eventModeStyle['colors'][0].withOpacity(0.3),
+                                        color: (eventModeStyle['colors'] as List<Color>)[0].withOpacity(0.3),
                                         blurRadius: 8,
                                         offset: const Offset(0, 3),
                                       ),
@@ -1588,7 +1611,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
-                                        eventModeStyle['icon'],
+                                        eventModeStyle['icon'] as IconData,
                                         color: Colors.white,
                                         size: 14,
                                       ),
@@ -1610,9 +1633,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 16),
-
                             // Event title - smaller font
                             Text(
                               widget.event.title,
@@ -1623,9 +1644,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                                 height: 1.2,
                               ),
                             ),
-
                             const SizedBox(height: 16),
-
                             // Time and location info - more compact
                             Column(
                               children: [
@@ -1737,9 +1756,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 12),
-
                     // Description Section - more compact
                     Container(
                       width: double.infinity,
@@ -1798,9 +1815,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 12),
-
                     // RSVP Section - more compact
                     Container(
                       width: double.infinity,
@@ -1847,9 +1862,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                               ),
                             ],
                           ),
-
                           const SizedBox(height: 16),
-
                           // Show current status or buttons
                           if (widget.event.bookingStatus != null) ...[
                             Container(
@@ -2068,7 +2081,6 @@ class _EventDetailsPageState extends State<EventDetailsPage> with TickerProvider
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 24),
                   ],
                 ),

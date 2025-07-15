@@ -566,10 +566,14 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       return {
-        'user_email': prefs.getString('user_email'),
-        'user_role': prefs.getInt('user_role'),
-        'group_code': prefs.getString('group_code'),
-        'member_id': prefs.getString('member_id'),
+        'email': prefs.getString('email'),
+        'role_id': prefs.getString('role_id'),
+        'Grop_code': prefs.getString('Grop_code'),
+        'M_ID': prefs.getString('M_ID'),
+        'Name': prefs.getString('Name'),
+        'number': prefs.getString('number'),
+             
+        'G_ID': prefs.getString('G_ID'),
       };
     } catch (error) {
       debugPrint('Error getting user data: $error');
@@ -619,7 +623,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
 
   Future<void> _checkBusinessExists() async {
     final userData = await _getUserData();
-    if (userData?['member_id'] == null) {
+    if (userData?['M_ID'] == null) {
       _showNotification('User not found', isError: true);
       return;
     }
@@ -627,7 +631,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
     try {
       final businesses = await ApiService.fetchBusinesses();
       final userBusiness = businesses.firstWhere(
-        (business) => business.mId == userData!['member_id'],
+        (business) => business.mId == userData!['M_ID'],
         orElse: () => throw Exception('No business found'),
       );
 
@@ -698,7 +702,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
     }
 
     final userData = await _getUserData();
-    if (userData?['member_id'] == null) {
+    if (userData?['M_ID'] == null) {
       _showNotification('User not found', isError: true);
       return;
     }
@@ -723,8 +727,8 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
       final business = BusinessModel(
         businessName: _businessNameController.text,
         bCatId: _selectedCategoryId,
-        gId: userData!['group_code'] ?? '',
-        mId: userData['member_id'] ?? '',
+        gId: userData!['Grop_code'] ?? '',
+        mId: userData['M_ID'] ?? '',
         logo: logoArray,
       );
 
@@ -750,7 +754,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
     }
 
     final userData = await _getUserData();
-    if (userData?['member_id'] == null) {
+    if (userData?['M_ID'] == null) {
       _showNotification('User not found', isError: true);
       return;
     }
@@ -787,8 +791,8 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
         instalink: _instalinkController.text.isEmpty ? null : _instalinkController.text,
         tellink: _tellinkController.text.isEmpty ? null : _tellinkController.text,
         lilink: _lilinkController.text.isEmpty ? null : _lilinkController.text,
-        gId: userData!['group_code'] ?? '',
-        mId: userData['member_id'] ?? '',
+        gId: userData!['Grop_code'] ?? '',
+        mId: userData['M_ID'] ?? '',
         logo: logoArray,
       );
 

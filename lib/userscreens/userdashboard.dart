@@ -4,7 +4,6 @@ import 'package:lbn/screens/loginscreen.dart';
 import 'package:lbn/screens/settingslbn.dart';
 import 'package:lbn/userscreens/businessprofile.dart';
 import 'package:lbn/userscreens/circlemeetings.dart';
-import 'package:lbn/userscreens/circlemeetinguser.dart';
 import 'package:lbn/userscreens/eventsmembers.dart';
 import 'package:lbn/userscreens/meetingsuser.dart';
 import 'package:lbn/userscreens/memberprofile.dart';
@@ -395,7 +394,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const OneToOnePage()),
+                    MaterialPageRoute(builder: (context) => const OneToOneMeetingScreen()),
                   );
                 },
               ),
@@ -407,7 +406,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => CircleMeetingPage()),
+                    MaterialPageRoute(builder: (context) => CircleMeetingsPage()),
                   );
                 },
               ),

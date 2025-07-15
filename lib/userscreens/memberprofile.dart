@@ -49,8 +49,8 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> fetchUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final storedUserId = prefs.getString('member_id');
-      print('Retrieved member_id from SharedPreferences: $storedUserId');
+      final storedUserId = prefs.getString('M_ID');
+      print('Retrieved M_ID from SharedPreferences: $storedUserId');
 
       if (storedUserId == null) {
         setState(() {
@@ -98,13 +98,13 @@ class _ProfilePageState extends State<ProfilePage> {
           });
 
           // Update SharedPreferences with fetched data
-          await prefs.setString('member_id', storedUserId);
-          await prefs.setString('user_name', name!);
-          await prefs.setString('user_email', email!);
-          await prefs.setString('user_phone', number!);
-          if (groupId != null) await prefs.setString('group_id', groupId!);
-          if (groupCode != null) await prefs.setString('group_code', groupCode!);
-          if (userRole != null) await prefs.setInt('user_role', userRole!);
+          await prefs.setString('M_ID', member['M_ID'].toString());
+          await prefs.setString('Name', member['Name'] ?? 'N/A');
+          await prefs.setString('email', member['email'] ?? 'N/A');
+          await prefs.setString('number', member['number'] ?? 'N/A');
+          await prefs.setString('Grop_code', member['Grop_code'] ?? '');
+          await prefs.setString('G_ID', member['G_ID']?.toString() ?? '');
+          await prefs.setString('role_id', member['role_id']?.toString() ?? '');
         } else {
           print('No matching member found in API, using SharedPreferences data');
           setState(() {
@@ -184,13 +184,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Update SharedPreferences with new data
-        await prefs.setString('user_name', _nameController.text);
-        await prefs.setString('user_email', _emailController.text);
-        await prefs.setString('user_phone', _numberController.text);
-        await prefs.setString('member_id', userId!);
-        if (groupId != null) await prefs.setString('group_id', groupId!);
-        if (groupCode != null) await prefs.setString('group_code', groupCode!);
-        if (userRole != null) await prefs.setInt('user_role', userRole!);
+        await prefs.setString('M_ID', userId!);
+        await prefs.setString('Name', _nameController.text);
+        await prefs.setString('email', _emailController.text);
+        await prefs.setString('number', _numberController.text);
+        await prefs.setString('Grop_code', groupCode ?? '');
+        await prefs.setString('G_ID', groupId ?? '');
+        await prefs.setString('role_id', userRole?.toString() ?? '');
 
         setState(() {
           name = _nameController.text;
@@ -435,7 +435,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
+                          if (value == null  || value.isEmpty) {
                             return 'Please enter an email';
                           }
                           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
