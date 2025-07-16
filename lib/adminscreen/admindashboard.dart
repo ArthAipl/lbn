@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:lbn/adminscreen/adminonetoone.dart';
 import 'package:lbn/adminscreen/eventsadmin.dart';
 import 'package:lbn/adminscreen/grupmembers.dart';
@@ -8,6 +9,34 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lbn/adminscreen/adminprofilepage.dart';
 import 'package:lbn/screens/loginscreen.dart';
 import 'package:flutter/services.dart';
+import 'dart:convert';
+
+// Model for Group data to ensure type safety
+class Group {
+  final String gId;
+  final String groupName;
+
+  Group({required this.gId, required this.groupName});
+
+  factory Group.fromJson(Map<String, dynamic> json) {
+    return Group(
+      gId: json['G_ID'].toString(),
+      groupName: json['group_name'] ?? '',
+    );
+  }
+}
+
+// Enum for feature navigation to prevent dynamic type issues
+enum Feature {
+  requests,
+  members,
+  events,
+  meetings,
+  oneToOne,
+  circleMeeting,
+  committeeMembers,
+  profile
+}
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -20,10 +49,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String userName = '';
   String userEmail = '';
   String groupCode = '';
+  String groupName = '';
+  String gId = '';
   bool isLoading = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Sample stats
+  // Sample stats (consider fetching from API if dynamic)
   final Map<String, int> stats = {
     'Events This Month': 8,
     'Active Projects': 12,
@@ -38,13 +69,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _loadUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       setState(() {
-        userName = prefs.getString('user_name') ?? '';
-        userEmail = prefs.getString('user_email') ?? '';
-        groupCode = prefs.getString('group_code') ?? '';
+        userName = prefs.getString('Name') ?? '';
+        userEmail = prefs.getString('email') ?? '';
+        groupCode = prefs.getString('Group_code') ?? '';
+        gId = prefs.getString('G_ID') ?? '';
         isLoading = false;
       });
+
+      if (gId.isNotEmpty) {
+        await _fetchGroupName();
+      }
 
       if (userName.isEmpty && userEmail.isEmpty) {
         if (mounted) {
@@ -71,6 +107,70 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
+  Future<void> _fetchGroupName() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://tagai.caxis.ca/public/api/group-master'),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = jsonDecode(response.body);
+        if (jsonData is List) {
+          final groups = jsonData.map((json) => Group.fromJson(json)).toList();
+          // Changed to nullable Group? to handle case where no group is found
+          final Group? group = groups.isNotEmpty
+              ? groups.firstWhere(
+                  (g) => g.gId == gId,
+                  orElse: () => Group(gId: gId, groupName: ''), // Return a default Group
+                )
+              : null;
+
+          if (group != null && mounted) {
+            setState(() {
+              groupName = group.groupName;
+            });
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Group not found'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Invalid API response format'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to fetch group name'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error fetching group name: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _logout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -78,7 +178,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     } catch (e) {
       debugPrint('Error clearing preferences: $e');
     }
-    
+
     if (mounted) {
       Navigator.pushReplacement(
         context,
@@ -87,47 +187,57 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  void _navigateToFeature(String featureName) {
+  void _navigateToFeature(Feature feature) {
     _scaffoldKey.currentState?.closeDrawer();
-    
-    switch (featureName) {
-      case 'Requests':
+
+    switch (feature) {
+      case Feature.requests:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const MemberApprovalScreen()),
         );
         break;
-      case 'Members':
+      case Feature.members:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const MembersPage()),
         );
         break;
-      case 'Events':
+      case Feature.events:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const EventsAdminPage()),
         );
         break;
-      case 'Meetings':
+      case Feature.meetings:
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => MeetingAdminPage()),
+          MaterialPageRoute(builder: (context) => const MeetingAdminPage()),
         );
         break;
-      case 'One 2 One':
+      case Feature.oneToOne:
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => OneToOneAdmin()),
+          MaterialPageRoute(builder: (context) => const OneToOneAdmin()),
         );
         break;
-      case 'Circle Meeting':
-        // TODO: Implement navigation to Circle Meeting Registration page
+      case Feature.circleMeeting:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Circle Meeting feature coming soon!'),
+            backgroundColor: Colors.blue,
+          ),
+        );
         break;
-      case 'Committee Members':
-        // TODO: Implement navigation to Committee Members page
+      case Feature.committeeMembers:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Committee Members feature coming soon!'),
+            backgroundColor: Colors.blue,
+          ),
+        );
         break;
-      case 'Profile':
+      case Feature.profile:
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const AdminProfilePage()),
@@ -179,150 +289,53 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildProfessionalDrawer() {
     return Drawer(
       backgroundColor: Colors.white,
-      child: SingleChildScrollView(
-        child: Container(
-          height: MediaQuery.of(context).size.height,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                children: [
-                  Container(
-                    width: double.infinity,
+      child: SafeArea(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              children: [
+                _buildDrawerMenuItem(
+                  icon: Icons.person_outline,
+                  title: 'My Profile',
+                  onTap: () => _navigateToFeature(Feature.profile),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: Container(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showLogoutDialog();
+                  },
+                  icon: const Icon(
+                    Icons.logout_rounded,
                     color: Colors.white,
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              userName.isNotEmpty ? userName : 'Admin User',
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              userEmail.isNotEmpty ? userEmail : 'admin@example.com',
-                              style: TextStyle(
-                                color: Colors.black.withOpacity(0.8),
-                                fontSize: 14,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.black.withOpacity(0.5),
-                                ),
-                              ),
-                              child: const Text(
-                                'Administrator',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            if (groupCode.isNotEmpty)
-                              Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 20),
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.group,
-                                      color: Colors.black,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Group: ',
-                                      style: TextStyle(
-                                        color: Colors.black.withOpacity(0.7),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    Text(
-                                      groupCode,
-                                      style: const TextStyle(
-                                        color: Colors.black,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    size: 20,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Column(
-                      children: [
-                        _buildDrawerMenuItem(
-                          icon: Icons.person_outline,
-                          title: 'My Profile',
-                          onTap: () => _navigateToFeature('Profile'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                child: Container(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showLogoutDialog();
-                    },
-                    icon: const Icon(
-                      Icons.logout_rounded,
+                  label: const Text(
+                    'Logout',
+                    style: TextStyle(
                       color: Colors.white,
-                      size: 20,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
-                    label: const Text(
-                      'Logout',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
+                    elevation: 2,
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -365,7 +378,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 
+
+4),
       ),
     );
   }
@@ -401,7 +416,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          userName.isNotEmpty ? 'Welcome back, $userName!' : 'Welcome back!',
+                          userName.isNotEmpty
+                              ? 'Welcome back, $userName! ${groupName.isNotEmpty ? '($groupName)' : ''}'
+                              : 'Welcome back! ${groupName.isNotEmpty ? '($groupName)' : ''}',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -464,12 +481,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildFeaturesGrid() {
     final features = [
-      {'title': 'Requests', 'icon': Icons.person_add_rounded, 'color': Colors.blue},
-      {'title': 'Members', 'icon': Icons.people_alt_rounded, 'color': const Color(0xFF6C63FF)},
-      {'title': 'Events', 'icon': Icons.event_rounded, 'color': Colors.green},
-      {'title': 'Meetings', 'icon': Icons.meeting_room_rounded, 'color': Colors.orange},
-      {'title': 'One 2 One', 'icon': Icons.person_pin_rounded, 'color': Colors.purple},
-      {'title': 'Circle Meeting Registration', 'icon': Icons.event_available_rounded, 'color': Colors.teal},
+      {'title': 'Requests', 'icon': Icons.person_add_rounded, 'color': Colors.blue, 'feature': Feature.requests},
+      {'title': 'Members', 'icon': Icons.people_alt_rounded, 'color': const Color(0xFF6C63FF), 'feature': Feature.members},
+      {'title': 'Events', 'icon': Icons.event_rounded, 'color': Colors.green, 'feature': Feature.events},
+      {'title': 'Meetings', 'icon': Icons.meeting_room_rounded, 'color': Colors.orange, 'feature': Feature.meetings},
+      {'title': 'One 2 One', 'icon': Icons.person_pin_rounded, 'color': Colors.purple, 'feature': Feature.oneToOne},
+      {'title': 'Circle Meeting Registration', 'icon': Icons.event_available_rounded, 'color': Colors.teal, 'feature': Feature.circleMeeting},
     ];
 
     return GridView.builder(
@@ -488,6 +505,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           feature['title'] as String,
           feature['icon'] as IconData,
           feature['color'] as Color,
+          feature['feature'] as Feature,
         );
       },
     );
@@ -495,8 +513,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildCommitteeMembersGrid() {
     final committeeMembers = [
-      {'title': 'Secretary', 'icon': Icons.description_rounded, 'color': Colors.orange},
-      {'title': 'Treasurer', 'icon': Icons.account_balance_rounded, 'color': Colors.purple},
+      {'title': 'Secretary', 'icon': Icons.description_rounded, 'color': Colors.orange, 'feature': Feature.committeeMembers},
+      {'title': 'Treasurer', 'icon': Icons.settings, 'color': Colors.purple, 'feature': Feature.committeeMembers},
     ];
 
     return GridView.builder(
@@ -515,14 +533,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
           member['title'] as String,
           member['icon'] as IconData,
           member['color'] as Color,
+          member['feature'] as Feature,
         );
       },
     );
   }
 
-  Widget _buildFeatureCard(String title, IconData icon, Color color) {
+  Widget _buildFeatureCard(String title, IconData icon, Color color, Feature feature) {
     return GestureDetector(
-      onTap: () => _navigateToFeature(title),
+      onTap: () => _navigateToFeature(feature),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _saveUserData(Map<String, dynamic> userData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Remove only specified user-related keys
+      // Remove user-related keys to ensure clean state
       await prefs.remove('M_ID');
       await prefs.remove('Name');
       await prefs.remove('email');
@@ -54,33 +54,55 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.remove('Grop_code');
       await prefs.remove('G_ID');
       await prefs.remove('role_id');
+      await prefs.remove('group_name'); // Optional, for admins
+      await prefs.remove('short_group_name'); // Optional, for admins
 
-      // Validate required fields
-      if (userData['M_ID'] == null ||
-          userData['Name'] == null ||
-          userData['email'] == null ||
-          userData['number'] == null ||
-          userData['Grop_code'] == null ||
-          userData['G_ID'] == null ||
-          userData['role_id'] == null) {
-        throw Exception('Missing required user data fields');
+      // Determine role_id to handle admin (2) or member (3)
+      final roleId = userData['role_id']?.toString();
+      if (roleId == null) {
+        throw Exception('Missing role_id in user data');
       }
 
-      // Save specified user data
-      await prefs.setString('M_ID', userData['M_ID'].toString());
-      await prefs.setString('Name', userData['Name']);
-      await prefs.setString('email', userData['email']);
-      await prefs.setString('number', userData['number']);
-      await prefs.setString('Grop_code', userData['Grop_code']);
-      await prefs.setString('G_ID', userData['G_ID'].toString());
-      await prefs.setString('role_id', userData['role_id'].toString());
+      // Handle field variations for admin and member
+      final mId = userData['M_ID']?.toString(); // Only for members
+      final name = userData['Name']?.toString() ?? userData['name']?.toString();
+      final email = userData['email']?.toString();
+      final number = userData['number']?.toString();
+      final groupCode = userData['Grop_code']?.toString();
+      final gId = userData['G_ID']?.toString();
 
-      debugPrint('User data saved successfully: ${userData.toString()}');
+      // Validate required fields (M_ID only required for members)
+      if (name == null || email == null || number == null || groupCode == null || gId == null) {
+        throw Exception('Missing required user data fields');
+      }
+      if (roleId == '3' && mId == null) {
+        throw Exception('Missing M_ID for member');
+      }
+
+      // Save user data
+      if (roleId == '3') {
+        await prefs.setString('M_ID', mId!); // Save M_ID only for members
+      }
+      await prefs.setString('Name', name);
+      await prefs.setString('email', email);
+      await prefs.setString('number', number);
+      await prefs.setString('Grop_code', groupCode);
+      await prefs.setString('G_ID', gId);
+      await prefs.setString('role_id', roleId);
+
+      // Save additional admin fields if role_id is 2 (optional, remove if not needed)
+      if (roleId == '2') {
+        await prefs.setString('group_name', userData['group_name']?.toString() ?? '');
+        await prefs.setString('short_group_name', userData['short_group_name']?.toString() ?? '');
+      }
+
+      debugPrint('User data saved successfully: role_id=$roleId, Name=$name, G_ID=$gId${roleId == '3' ? ', M_ID=$mId' : ''}');
     } catch (e) {
       debugPrint('Error saving user data: $e');
       setState(() {
         _errorMessage = 'Failed to save user data. Please try again.';
       });
+      rethrow; // Prevent navigation if saving fails
     }
   }
 
@@ -135,8 +157,10 @@ class _LoginScreenState extends State<LoginScreen> {
             return;
           }
 
+          // Save user data before navigating
           await _saveUserData(userData);
 
+          // Navigate based on role_id
           if (userRole == 2) {
             debugPrint('Navigating to Admin Dashboard');
             Navigator.pushReplacement(
@@ -304,7 +328,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 8),
                             TextField(
-                              controller: _passwordController,
+                              controller: _passwordController, // Fixed typo: _passwordContainer -> _passwordController
                               obscureText: _obscurePassword,
                               decoration: InputDecoration(
                                 hintText: 'Enter your password',

@@ -30,7 +30,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
     try {
       debugPrint('Loading group code and members...');
       final prefs = await SharedPreferences.getInstance();
-      groupCode = prefs.getString('group_code');
+      groupCode = prefs.getString('Grop_code'); // Updated to use Grop_code
       debugPrint('Retrieved group code from SharedPreferences: $groupCode');
 
       if (groupCode == null || groupCode!.isEmpty) {
@@ -166,6 +166,48 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
     }
   }
 
+  Future<void> _logout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('M_ID');
+      await prefs.remove('Name');
+      await prefs.remove('email');
+      await prefs.remove('number');
+      await prefs.remove('Grop_code');
+      await prefs.remove('G_ID');
+      await prefs.remove('role_id');
+      await prefs.remove('group_name');
+      await prefs.remove('short_group_name');
+      debugPrint('SharedPreferences cleared successfully');
+      // Navigate to login screen or reset app state
+      // Navigator.pushReplacementNamed(context, '/login'); // Uncomment and adjust route as needed
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Logged out successfully'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error clearing SharedPreferences: ${e.toString()}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Error logging out. Please try again.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        ),
+      );
+    }
+  }
+
   void _changeStatusFilter(int status) {
     setState(() {
       currentStatusFilter = status;
@@ -210,6 +252,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
         backgroundColor: Colors.black,
         elevation: 0,
         actions: [
+          
           PopupMenuButton<int>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) {

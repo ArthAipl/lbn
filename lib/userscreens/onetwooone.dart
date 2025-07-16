@@ -5,37 +5,9 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io'; // For File operations
-
-// Assuming lucide_icons is available, otherwise map to Material Icons
 import 'package:lucide_icons/lucide_icons.dart';
 
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'One-To-One Meetings',
-      theme: ThemeData(
-        primarySwatch: Colors.blueGrey,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black, // App bar black
-          foregroundColor: Colors.white, // Text and icon white
-          elevation: 0,
-        ),
-        scaffoldBackgroundColor: Colors.grey[50],
-      ),
-      home: const OneToOneMeetingScreen(),
-    );
-  }
-}
-
-// Data Models (Define these classes in a separate file like models/data_models.dart if your project grows)
+// Data Models
 class Member {
   final String mId;
   final String name;
@@ -76,7 +48,7 @@ class Meeting {
   final String status;
   final Member? fromMember;
   final Member? toMember;
-  final List<String> images; // Storing image paths/URLs as strings
+  final List<String> images;
 
   Meeting({
     required this.one2oneId,
@@ -113,47 +85,60 @@ class Meeting {
   }
 }
 
-// Custom Logo Loader (Mimics the original's visual style)
+// Custom Logo Loader
 class CustomLogoLoader extends StatelessWidget {
   const CustomLogoLoader({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white.withOpacity(0.9),
+      color: Colors.black.withOpacity(0.7),
       child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Text animation (simplified for Flutter conversion)
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0.5, end: 1.0),
-              duration: const Duration(milliseconds: 750),
-              builder: (context, opacity, child) {
-                return Opacity(
-                  opacity: opacity,
-                  child: Text(
-                    'Loading...',
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                );
-              },
-              // For continuous repeat, a StatefulWidget with AnimationController is needed.
-              // This will animate once.
-            ),
-            const SizedBox(height: 16.0),
-            SizedBox(
-              width: 192.0, // Equivalent to w-48
-              height: 6.0, // Equivalent to h-1.5
-              child: LinearProgressIndicator(
-                backgroundColor: Colors.grey[200],
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.black),
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0.5, end: 1.0),
+                duration: const Duration(milliseconds: 750),
+                builder: (context, opacity, child) {
+                  return Opacity(
+                    opacity: opacity,
+                    child: const Text(
+                      'Loading...',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: 200,
+                height: 4,
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.grey[200],
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.black),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -174,7 +159,7 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
   List<Meeting> _meetings = [];
   bool _isCompletionModalOpen = false;
   Meeting? _selectedMeetingForCompletion;
-  List<File> _completionImages = []; // Stores File objects for local display
+  List<File> _completionImages = [];
   bool _isLoading = false;
 
   // User data from SharedPreferences
@@ -186,57 +171,25 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
   String _searchTerm = "";
 
   late TabController _tabController;
-  int _previousTabIndex = 0; // To store the index of the last selected content tab
 
-  // Define all tabs with their properties
+  // Define tabs
   final List<Map<String, dynamic>> _tabsData = [
-    {"id": "my_meetings", "label": "My Meetings", "icon": LucideIcons.calendar},
-    {"id": "group_members", "label": "Group Members", "icon": LucideIcons.users},
-    {"id": "scheduled", "label": "Scheduled Meeting", "icon": LucideIcons.clock},
-    {"id": "history", "label": "History", "icon": LucideIcons.history},
-    {"id": "new_meeting", "label": "New Meeting", "icon": LucideIcons.plus}, // New tab for the button
+    {"id": "my_meetings", "label": "My Meetings"},
+    {"id": "group_members", "label": "Group Members"},
+    {"id": "requests", "label": "Requests"},
+    {"id": "scheduled", "label": "Scheduled Meeting"},
+    {"id": "history", "label": "History"},
   ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabsData.length, vsync: this);
-    _tabController.addListener(_handleTabSelection); // Add listener for tab changes
     _loadUserDataAndFetchData();
-  }
-
-  void _handleTabSelection() {
-    if (!_tabController.indexIsChanging) {
-      final currentTabId = _tabsData[_tabController.index]["id"];
-      if (currentTabId == "new_meeting") {
-        // If "New Meeting" tab is selected, navigate to new screen and revert tab
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => NewMeetingScreen(
-                members: _members,
-                fromMID: _fromMID!,
-                gID: _gID!,
-                onMeetingSent: _fetchMeetings, // Callback to refresh meetings
-              ),
-            ),
-          );
-          // Revert to the previous tab after returning from NewMeetingScreen
-          _tabController.animateTo(_previousTabIndex,
-              duration: const Duration(milliseconds: 300), curve: Curves.ease);
-        });
-      } else {
-        // For regular content tabs, update previousTabIndex
-        _previousTabIndex = _tabController.index;
-        // No need to update _activeTab or _rejectFilter here as they are managed internally now
-      }
-    }
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_handleTabSelection); // Remove listener
     _tabController.dispose();
     super.dispose();
   }
@@ -245,6 +198,7 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     setState(() {
       _isLoading = true;
     });
+
     final prefs = await SharedPreferences.getInstance();
     _fromMID = prefs.getString('M_ID');
     _gID = prefs.getString('G_ID');
@@ -253,6 +207,7 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     if (_gID != null && _fromMID != null) {
       await Future.wait([_fetchMembers(), _fetchMeetings()]);
     }
+
     setState(() {
       _isLoading = false;
     });
@@ -264,6 +219,7 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
         Uri.parse("https://tagai.caxis.ca/public/api/member"),
         headers: {"Content-Type": "application/json"},
       );
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status']) {
@@ -274,6 +230,7 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
                   member.groupCode == _groupCode &&
                   member.mId != _fromMID)
               .toList();
+
           setState(() {
             _members = fetchedMembers;
           });
@@ -295,10 +252,12 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
         Uri.parse("https://tagai.caxis.ca/public/api/one2one"),
         headers: {"Content-Type": "application/json"},
       );
+
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         final List<Meeting> fetchedMeetings =
             data.map((json) => Meeting.fromJson(json)).toList();
+
         setState(() {
           _meetings = fetchedMeetings;
         });
@@ -317,16 +276,21 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     setState(() {
       _isLoading = true;
     });
+
     try {
       final response = await http.put(
         Uri.parse("https://tagai.caxis.ca/public/api/one2one/$meetingId"),
         headers: {"Content-Type": "application/json"},
         body: json.encode({"Status": "1"}),
       );
+
       if (response.statusCode == 200) {
         _fetchMeetings();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Meeting accepted successfully!")),
+          const SnackBar(
+            content: Text("Meeting accepted successfully!"),
+            backgroundColor: Colors.green,
+          ),
         );
       } else {
         throw Exception("Failed to accept meeting");
@@ -334,7 +298,10 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     } catch (e) {
       print("Error accepting meeting: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error accepting meeting: $e")),
+        SnackBar(
+          content: Text("Error accepting meeting: $e"),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       setState(() {
@@ -347,16 +314,21 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     setState(() {
       _isLoading = true;
     });
+
     try {
       final response = await http.put(
         Uri.parse("https://tagai.caxis.ca/public/api/one2one/$meetingId"),
         headers: {"Content-Type": "application/json"},
         body: json.encode({"Status": "2"}),
       );
+
       if (response.statusCode == 200) {
         _fetchMeetings();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Meeting rejected successfully!")),
+          const SnackBar(
+            content: Text("Meeting rejected successfully!"),
+            backgroundColor: Colors.orange,
+          ),
         );
       } else {
         throw Exception("Failed to reject meeting");
@@ -364,7 +336,10 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     } catch (e) {
       print("Error rejecting meeting: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error rejecting meeting: $e")),
+        SnackBar(
+          content: Text("Error rejecting meeting: $e"),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       setState(() {
@@ -384,6 +359,7 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
   Future<void> _handleCompletionImageUpload() async {
     final picker = ImagePicker();
     final pickedFiles = await picker.pickMultiImage();
+
     if (pickedFiles != null) {
       setState(() {
         _completionImages.addAll(pickedFiles.map((xfile) => File(xfile.path)));
@@ -404,16 +380,13 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
       _isLoading = true;
     });
 
-    // In a real app, you would upload images to a server and get their URLs.
-    // For this example, we'll just pass the local paths as strings.
-    // The original React code also just stored local URLs.
     final List<String> imageUrls = withImages
         ? _completionImages.map((file) => file.path).toList()
         : [];
 
     final payload = {
       "Status": "3",
-      "Image": imageUrls, // Sending local paths/URLs as strings
+      "Image": imageUrls,
     };
 
     try {
@@ -425,9 +398,12 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
       );
 
       if (response.statusCode == 200) {
-        _fetchMeetings(); // Re-fetch to update status and images
+        _fetchMeetings();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Meeting marked as completed successfully!")),
+          const SnackBar(
+            content: Text("Meeting marked as completed successfully!"),
+            backgroundColor: Colors.green,
+          ),
         );
         setState(() {
           _isCompletionModalOpen = false;
@@ -440,7 +416,10 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     } catch (e) {
       print("Error completing meeting: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to complete meeting: $e")),
+        SnackBar(
+          content: Text("Failed to complete meeting: $e"),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       setState(() {
@@ -478,7 +457,7 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     return _meetings.where((meeting) =>
         meeting.status == "1" &&
         (meeting.fromMid == _fromMID || meeting.toMid == _fromMID) &&
-        !_isMeetingDatePassed(meeting)).toList(); // Only future scheduled meetings
+        !_isMeetingDatePassed(meeting)).toList();
   }
 
   List<Meeting> get _completedMeetingsForUser {
@@ -493,60 +472,66 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
         (meeting.fromMid == _fromMID || meeting.toMid == _fromMID)).toList();
   }
 
+  List<Meeting> get _requestsForUser {
+    return _meetings.where((meeting) =>
+        meeting.toMid == _fromMID && meeting.status == "0").toList();
+  }
+
   bool _isMeetingDatePassed(Meeting meeting) {
     try {
       final meetingDateTime = DateTime.parse("${meeting.date}T${meeting.time}");
       return meetingDateTime.isBefore(DateTime.now());
     } catch (e) {
       print("Error parsing date/time for meeting: ${meeting.date}T${meeting.time} - $e");
-      return false; // Or handle error appropriately
+      return false;
     }
   }
 
-  // Helper to get the count for a specific tab ID
   int _getTabCount(String tabId) {
     switch (tabId) {
       case "my_meetings":
-        return _allMeetingsForUser.length; // My Meetings shows all relevant meetings
+        return _allMeetingsForUser.length;
       case "group_members":
         return _members.length;
+      case "requests":
+        return _requestsForUser.length;
       case "scheduled":
         return _scheduledMeetingsForUser.length;
       case "history":
         return _completedMeetingsForUser.length;
       default:
-        return 0; // For "new_meeting" tab, count is 0
+        return 0;
     }
   }
 
-  // Helper to build the content of a regular tab (with count)
-  Widget _buildTabContent(IconData icon, String label, int count, int tabIndex) {
+  Widget _buildTabContent(String label, int count, int tabIndex) {
     return Tab(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 16),
-          const SizedBox(width: 8),
-          Text(label),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
+          ),
           if (count > 0)
             Padding(
               padding: const EdgeInsets.only(left: 8.0),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: _tabController.index == tabIndex
-                      ? Colors.white.withOpacity(0.2) // Selected state
-                      : Colors.grey[200], // Unselected state
+                  color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   count.toString(),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: _tabController.index == tabIndex
-                        ? Colors.white // Selected state
-                        : Colors.grey[700], // Unselected state
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -559,54 +544,38 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: _tabsData.length, // Total number of tabs including "New Meeting"
+      length: _tabsData.length,
       child: Scaffold(
+        backgroundColor: Colors.grey[50],
         appBar: AppBar(
+          backgroundColor: Colors.black,
+          elevation: 0,
           title: const Text(
-            'One-To-One',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            'One To One',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
           ),
+          iconTheme: const IconThemeData(color: Colors.white),
           bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(100.0), // Adjusted height for title/subtitle and TabBar
+            preferredSize: const Size.fromHeight(50.0),
             child: Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'One-To-One',
-                        style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white),
-                      ),
-                      Text(
-                        'Manage your professional meetings efficiently',
-                        style: TextStyle(color: Colors.grey[300], fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
                 TabBar(
                   controller: _tabController,
-                  isScrollable: true, // Allows tabs to scroll if many
-                  indicatorColor: Colors.white,
+                  isScrollable: true,
+                  indicatorColor: Colors.transparent,
                   labelColor: Colors.white,
                   unselectedLabelColor: Colors.grey[400],
-                  indicator: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
                   tabs: _tabsData.asMap().entries.map((entry) {
                     final index = entry.key;
                     final tabData = entry.value;
                     return _buildTabContent(
-                      tabData["icon"],
                       tabData["label"],
                       _getTabCount(tabData["id"]),
-                      index, // Pass current index to helper for indicator color
+                      index,
                     );
                   }).toList(),
                 ),
@@ -619,11 +588,11 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
             TabBarView(
               controller: _tabController,
               children: [
-                _buildMyMeetingsTab(), // New consolidated tab
+                _buildMyMeetingsTab(),
                 _buildMembersTab(),
+                _buildRequestsTab(),
                 _buildMeetingsTab(_scheduledMeetingsForUser, showActions: true),
                 _buildMeetingsTab(_completedMeetingsForUser, isHistory: true),
-                const Center(child: Text("")), // Placeholder for the "New Meeting" tab
               ],
             ),
             if (_isLoading) const CustomLogoLoader(),
@@ -635,9 +604,7 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
   }
 
   Widget _buildMyMeetingsTab() {
-    // Internal state for My Meetings tab's filter
-    // This state is local to this widget's build method, managed by StatefulBuilder
-    String myMeetingsFilter = "all"; // all, pending, accepted, rejected, completed
+    String myMeetingsFilter = "all";
 
     return StatefulBuilder(
       builder: (BuildContext context, StateSetter setInnerState) {
@@ -650,7 +617,7 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
             filteredList = _pendingRequestsForUser;
             break;
           case "accepted":
-            filteredList = _allMeetingsForUser.where((m) => m.status == "1").toList(); // All accepted, not just future
+            filteredList = _allMeetingsForUser.where((m) => m.status == "1").toList();
             break;
           case "rejected":
             filteredList = _rejectedMeetingsForUser;
@@ -668,63 +635,40 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
+                padding: const EdgeInsets.only(bottom: 20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'My Meetings',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Manage all your meeting requests and schedules',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      child: ToggleButtons(
-                        isSelected: [
-                          myMeetingsFilter == "all",
-                          myMeetingsFilter == "pending",
-                          myMeetingsFilter == "accepted",
-                          myMeetingsFilter == "rejected",
-                          myMeetingsFilter == "completed",
-                        ],
-                        onPressed: (int index) {
-                          setInnerState(() {
-                            myMeetingsFilter = [
-                              "all",
-                              "pending",
-                              "accepted",
-                              "rejected",
-                              "completed"
-                            ][index];
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        selectedColor: Colors.white,
-                        fillColor: Colors.black,
-                        color: Colors.grey[700],
-                        borderColor: Colors.grey[300],
-                        selectedBorderColor: Colors.black,
-                        children: const [
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12.0),
-                            child: Text('All'),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12.0),
-                            child: Text('Pending'),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12.0),
-                            child: Text('Accepted'),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12.0),
-                            child: Text('Rejected'),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12.0),
-                            child: Text('Completed'),
-                          ),
+                      child: Row(
+                        children: [
+                          _buildFilterChip("All", "all", myMeetingsFilter, setInnerState),
+                          const SizedBox(width: 8),
+                          _buildFilterChip("Pending", "pending", myMeetingsFilter, setInnerState),
+                          const SizedBox(width: 8),
+                          _buildFilterChip("Accepted", "accepted", myMeetingsFilter, setInnerState),
+                          const SizedBox(width: 8),
+                          _buildFilterChip("Rejected", "rejected", myMeetingsFilter, setInnerState),
+                          const SizedBox(width: 8),
+                          _buildFilterChip("Completed", "completed", myMeetingsFilter, setInnerState),
                         ],
                       ),
                     ),
@@ -732,22 +676,16 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
                 ),
               ),
               if (filteredList.isNotEmpty)
-                GridView.builder(
+                ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 1, // One column for better mobile layout
-                    childAspectRatio: 3 / 2, // Adjust as needed
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    mainAxisExtent: 280, // Fixed height for cards
-                  ),
                   itemCount: filteredList.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final meeting = filteredList[index];
                     return MeetingCard(
                       meeting: meeting,
-                      showActions: meeting.status == "0" || (meeting.status == "1" && _isMeetingDatePassed(meeting)),
+                      showActions: meeting.status == "0" && meeting.toMid == _fromMID,
                       isHistory: meeting.status == "3",
                       isMeetingDatePassed: _isMeetingDatePassed(meeting),
                       onAccept: _handleAcceptMeeting,
@@ -770,6 +708,104 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     );
   }
 
+  Widget _buildRequestsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Meeting Requests',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Review and respond to incoming meeting requests',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_requestsForUser.isNotEmpty)
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _requestsForUser.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                final meeting = _requestsForUser[index];
+                return MeetingCard(
+                  meeting: meeting,
+                  showActions: true,
+                  isHistory: false,
+                  isMeetingDatePassed: _isMeetingDatePassed(meeting),
+                  onAccept: _handleAcceptMeeting,
+                  onReject: _handleRejectMeeting,
+                  onComplete: _openCompletionModal,
+                  showSentStatus: false,
+                  fromMID: _fromMID!,
+                );
+              },
+            )
+          else
+            _buildEmptyState(
+              LucideIcons.inbox,
+              'No pending meeting requests',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value, String currentFilter, StateSetter setInnerState) {
+    final isSelected = currentFilter == value;
+    return GestureDetector(
+      onTap: () {
+        setInnerState(() {
+          currentFilter = value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Colors.black : Colors.grey[300]!,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMeetingsTab(List<Meeting> meetings,
       {bool showActions = false, bool isHistory = false, bool showSentStatus = false}) {
     return SingleChildScrollView(
@@ -778,22 +814,16 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (meetings.isNotEmpty)
-            GridView.builder(
+            ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 1, // One column for better mobile layout
-                childAspectRatio: 3 / 2, // Adjust as needed
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                mainAxisExtent: 280, // Fixed height for cards
-              ),
               itemCount: meetings.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
                 final meeting = meetings[index];
                 return MeetingCard(
                   meeting: meeting,
-                  showActions: showActions,
+                  showActions: showActions && meeting.toMid == _fromMID,
                   isHistory: isHistory,
                   isMeetingDatePassed: _isMeetingDatePassed(meeting),
                   onAccept: _handleAcceptMeeting,
@@ -821,16 +851,39 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.only(bottom: 20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Group Members',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
                 ),
-                SizedBox(
-                  width: 200,
+                const SizedBox(height: 8),
+                Text(
+                  'Connect with your team members',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: TextField(
                     onChanged: (value) {
                       setState(() {
@@ -839,14 +892,15 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
                     },
                     decoration: InputDecoration(
                       hintText: 'Search members...',
-                      prefixIcon: const Icon(LucideIcons.search, size: 16),
+                      hintStyle: TextStyle(color: Colors.grey[500]),
+                      prefixIcon: Icon(LucideIcons.search, size: 20, color: Colors.grey[500]),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
-                      fillColor: Colors.grey[100],
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     ),
                   ),
                 ),
@@ -858,11 +912,10 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // Two columns for members
-                childAspectRatio: 1.5, // Adjust as needed
+                crossAxisCount: 2,
+                childAspectRatio: 0.85,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                mainAxisExtent: 150, // Fixed height for member cards
               ),
               itemCount: _filteredMembers.length,
               itemBuilder: (context, index) {
@@ -870,7 +923,6 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
                 return MemberCard(
                   member: member,
                   onTap: (selectedMember) {
-                    // Navigate to NewMeetingScreen with pre-selected member
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -900,15 +952,26 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
   Widget _buildEmptyState(IconData icon, String message) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48.0),
+        padding: const EdgeInsets.symmetric(vertical: 60.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 48, color: Colors.grey[300]),
-            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Icon(icon, size: 48, color: Colors.grey[400]),
+            ),
+            const SizedBox(height: 20),
             Text(
               message,
-              style: TextStyle(color: Colors.grey[500], fontSize: 16),
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -920,11 +983,15 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
     if (_selectedMeetingForCompletion == null) return const SizedBox.shrink();
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
         constraints: BoxConstraints(
             maxWidth: 400, maxHeight: MediaQuery.of(context).size.height * 0.8),
         padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -933,10 +1000,14 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
               children: [
                 const Text(
                   'Complete Meeting',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
                 ),
                 IconButton(
-                  icon: const Icon(LucideIcons.x, size: 20),
+                  icon: const Icon(LucideIcons.x, size: 24, color: Colors.black),
                   onPressed: () {
                     setState(() {
                       _isCompletionModalOpen = false;
@@ -949,10 +1020,10 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
             ),
             const SizedBox(height: 24),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.grey[200]!),
               ),
               child: Column(
@@ -961,11 +1032,11 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
                   Text(
                     'Meeting Details',
                     style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.blueGrey[700]),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   _buildDetailRow(
                       LucideIcons.users,
                       _selectedMeetingForCompletion!.fromMid == _fromMID
@@ -989,9 +1060,9 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
                 Text(
                   'Add Meeting Photos (Optional)',
                   style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blueGrey[700]),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black),
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
@@ -1019,8 +1090,8 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
                           'Selected Photos:',
                           style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.blueGrey[700]),
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black),
                         ),
                         const SizedBox(height: 8),
                         GridView.builder(
@@ -1085,11 +1156,12 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 0,
                     ),
                     icon: const Icon(LucideIcons.checkCircle, size: 16),
-                    label: const Text('Complete with Photos'),
+                    label: const Text('Complete with Photos', style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1102,10 +1174,11 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
                       side: BorderSide(color: Colors.grey[300]!),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 0,
                     ),
-                    child: const Text('Skip Photos'),
+                    child: const Text('Skip Photos', style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
@@ -1118,15 +1191,15 @@ class _OneToOneMeetingScreenState extends State<OneToOneMeetingScreen>
 
   Widget _buildDetailRow(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Colors.grey[600]),
-          const SizedBox(width: 8),
+          Icon(icon, size: 18, color: Colors.grey[600]),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              style: TextStyle(color: Colors.grey[700], fontSize: 14, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -1141,7 +1214,7 @@ class NewMeetingScreen extends StatefulWidget {
   final String fromMID;
   final String gID;
   final Member? preSelectedMember;
-  final VoidCallback onMeetingSent; // Callback to refresh data on previous screen
+  final VoidCallback onMeetingSent;
 
   const NewMeetingScreen({
     super.key,
@@ -1213,17 +1286,23 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Meeting request sent successfully!")),
+          const SnackBar(
+            content: Text("Meeting request sent successfully!"),
+            backgroundColor: Colors.green,
+          ),
         );
-        widget.onMeetingSent(); // Call callback to refresh data
-        Navigator.pop(context); // Go back to previous screen
+        widget.onMeetingSent();
+        Navigator.pop(context);
       } else {
         throw Exception("Failed to send meeting request: ${response.body}");
       }
     } catch (e) {
       print("Error sending meeting request: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to send meeting request: $e")),
+        SnackBar(
+          content: Text("Failed to send meeting request: $e"),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       setState(() {
@@ -1235,10 +1314,20 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('New Meeting Request'),
+        backgroundColor: Colors.black,
+        elevation: 0,
+        title: const Text(
+          'New Meeting Request',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios), // iOS back icon
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -1251,30 +1340,62 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
                 if (_selectedMember == null)
                   Expanded(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        TextField(
-                          onChanged: (value) {
-                            setState(() {
-                              _memberSearchTerm = value;
-                            });
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Search group members...',
-                            prefixIcon: const Icon(LucideIcons.search, size: 16),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
+                        const Text(
+                          'Select Member',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Choose a team member to send meeting request',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: TextField(
+                            onChanged: (value) {
+                              setState(() {
+                                _memberSearchTerm = value;
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Search group members...',
+                              hintStyle: TextStyle(color: Colors.grey[500]),
+                              prefixIcon: Icon(LucideIcons.search, size: 20, color: Colors.grey[500]),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 16),
                             ),
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
                         const SizedBox(height: 16),
                         Expanded(
-                          child: ListView.builder(
-                            shrinkWrap: true,
+                          child: ListView.separated(
                             itemCount: _filteredMembersForForm.length,
+                            separatorBuilder: (context, index) => const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final member = _filteredMembersForForm[index];
                               return GestureDetector(
@@ -1284,21 +1405,26 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
                                   });
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey[200]!),
-                                    borderRadius: BorderRadius.circular(8),
                                     color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
                                   child: Row(
                                     children: [
                                       Container(
-                                        width: 32,
-                                        height: 32,
+                                        width: 48,
+                                        height: 48,
                                         decoration: BoxDecoration(
                                           color: Colors.black,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Center(
                                           child: Text(
@@ -1307,26 +1433,37 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
                                                 : '',
                                             style: const TextStyle(
                                                 color: Colors.white,
-                                                fontSize: 12,
+                                                fontSize: 16,
                                                 fontWeight: FontWeight.bold),
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            member.name,
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w500, fontSize: 14),
-                                          ),
-                                          Text(
-                                            member.email,
-                                            style: TextStyle(
-                                                color: Colors.grey[500], fontSize: 12),
-                                          ),
-                                        ],
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              member.name,
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 16,
+                                                  color: Colors.black),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              member.email,
+                                              style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 14),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(
+                                        LucideIcons.chevronRight,
+                                        color: Colors.grey[400],
+                                        size: 20,
                                       ),
                                     ],
                                   ),
@@ -1342,32 +1479,97 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const Text(
+                            'Meeting Details',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Fill in the meeting information',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[200]!),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Sending request to:',
-                                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                                Row(
+                                  children: [
+                                    Icon(LucideIcons.user, size: 20, color: Colors.grey[600]),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Sending request to:',
+                                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  _selectedMember!.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w500, color: Colors.black),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: Colors.black,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          _selectedMember!.name.isNotEmpty
+                                              ? _selectedMember!.name[0].toUpperCase()
+                                              : '',
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _selectedMember!.name,
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black,
+                                                fontSize: 16),
+                                          ),
+                                          Text(
+                                            _selectedMember!.email,
+                                            style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 14),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                Text(
-                                  _selectedMember!.email,
-                                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                                ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 16),
                                 GestureDetector(
                                   onTap: () {
                                     setState(() {
@@ -1375,37 +1577,44 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
                                       _memberSearchTerm = "";
                                     });
                                   },
-                                  child: Text(
-                                    'Change recipient',
-                                    style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 14,
-                                        decoration: TextDecoration.underline),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Change recipient',
+                                      style: TextStyle(
+                                          color: Colors.grey[700],
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           _buildTextField(
                             controller: _placeController,
                             label: 'Meeting Location',
                             hint: 'Enter meeting location',
                             icon: LucideIcons.mapPin,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           _buildDateField(
                             controller: _dateController,
                             label: 'Meeting Date',
                             context: context,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           _buildTimeField(
                             controller: _timeController,
                             label: 'Meeting Time',
                             context: context,
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 32),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
@@ -1413,13 +1622,20 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.black,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(vertical: 18),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              icon: const Icon(LucideIcons.send, size: 18),
+                              label: const Text(
+                                'Send Meeting Request',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              icon: const Icon(LucideIcons.send, size: 16),
-                              label: const Text('Send Meeting Request'),
                             ),
                           ),
                         ],
@@ -1446,24 +1662,38 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey[700]),
+          style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black),
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: icon != null ? Icon(icon, size: 20) : null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              prefixIcon: icon != null ? Icon(icon, size: 20, color: Colors.grey[500]) : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.all(16),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blueGrey, width: 2),
-            ),
-            contentPadding: const EdgeInsets.all(12),
           ),
         ),
       ],
@@ -1480,37 +1710,51 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey[700]),
+          style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black),
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          readOnly: true,
-          decoration: InputDecoration(
-            hintText: 'Select Date',
-            prefixIcon: const Icon(LucideIcons.calendar, size: 20),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blueGrey, width: 2),
-            ),
-            contentPadding: const EdgeInsets.all(12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          onTap: () async {
-            DateTime? pickedDate = await showDatePicker(
-              context: context,
-              initialDate: DateTime.now(),
-              firstDate: DateTime.now(),
-              lastDate: DateTime(2101),
-            );
-            if (pickedDate != null) {
-              controller.text = DateFormat('yyyy-MM-dd').format(pickedDate);
-            }
-          },
+          child: TextFormField(
+            controller: controller,
+            readOnly: true,
+            decoration: InputDecoration(
+              hintText: 'Select Date',
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              prefixIcon: Icon(LucideIcons.calendar, size: 20, color: Colors.grey[500]),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.all(16),
+            ),
+            onTap: () async {
+              DateTime? pickedDate = await showDatePicker(
+                context: context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime.now(),
+                lastDate: DateTime(2101),
+              );
+              if (pickedDate != null) {
+                controller.text = DateFormat('yyyy-MM-dd').format(pickedDate);
+              }
+            },
+          ),
         ),
       ],
     );
@@ -1526,37 +1770,50 @@ class _NewMeetingScreenState extends State<NewMeetingScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey[700]),
+          style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black),
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          readOnly: true,
-          decoration: InputDecoration(
-            hintText: 'Select Time',
-            prefixIcon: const Icon(LucideIcons.clock, size: 20),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blueGrey, width: 2),
-            ),
-            contentPadding: const EdgeInsets.all(12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          onTap: () async {
-            TimeOfDay? pickedTime = await showTimePicker(
-              context: context,
-              initialTime: TimeOfDay.now(),
-            );
-            if (pickedTime != null) {
-              // Format TimeOfDay to a string like "HH:mm"
-              final MaterialLocalizations localizations = MaterialLocalizations.of(context);
-              controller.text = localizations.formatTimeOfDay(pickedTime, alwaysUse24HourFormat: true);
-            }
-          },
+          child: TextFormField(
+            controller: controller,
+            readOnly: true,
+            decoration: InputDecoration(
+              hintText: 'Select Time',
+              hintStyle: TextStyle(color: Colors.grey[500]),
+              prefixIcon: Icon(LucideIcons.clock, size: 20, color: Colors.grey[500]),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.all(16),
+            ),
+            onTap: () async {
+              TimeOfDay? pickedTime = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+              if (pickedTime != null) {
+                final MaterialLocalizations localizations = MaterialLocalizations.of(context);
+                controller.text = localizations.formatTimeOfDay(pickedTime, alwaysUse24HourFormat: true);
+              }
+            },
+          ),
         ),
       ],
     );
@@ -1593,7 +1850,7 @@ class MeetingCard extends StatelessWidget {
       case "0":
         return Colors.amber[50]!;
       case "1":
-        return Colors.green[50]!; // Mapped from emerald
+        return Colors.green[50]!;
       case "2":
         return Colors.red[50]!;
       case "3":
@@ -1608,7 +1865,7 @@ class MeetingCard extends StatelessWidget {
       case "0":
         return Colors.amber[700]!;
       case "1":
-        return Colors.green[700]!; // Mapped from emerald
+        return Colors.green[700]!;
       case "2":
         return Colors.red[700]!;
       case "3":
@@ -1639,15 +1896,20 @@ class MeetingCard extends StatelessWidget {
     final partnerName = isFromMe ? meeting.toMember?.name : meeting.fromMember?.name;
     final partnerInitial = partnerName?.isNotEmpty == true ? partnerName![0].toUpperCase() : '';
 
-    return Card(
-      elevation: 2, // Added subtle shadow
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12), // Slightly more rounded
-        side: BorderSide(color: Colors.grey[200]!),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1658,125 +1920,152 @@ class MeetingCard extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 50,
+                      height: 50,
                       decoration: BoxDecoration(
                         color: Colors.black,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Center(
-                        child: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: Text(
-                              partnerInitial,
-                              style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ),
+                        child: Text(
+                          partnerInitial,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      partnerName ?? 'N/A',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 16),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          partnerName ?? 'N/A',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: Colors.black),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isFromMe ? 'Request sent to' : 'Request from',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: _getStatusColor(meeting.status),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _getStatusColor(meeting.status).withOpacity(0.5)),
+                    border: Border.all(color: _getStatusTextColor(meeting.status).withOpacity(0.3)),
                   ),
                   child: Text(
                     _getStatusText(meeting.status),
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: _getStatusTextColor(meeting.status),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            _buildInfoRow(LucideIcons.mapPin, meeting.place),
-            _buildInfoRow(
-                LucideIcons.calendar,
-                DateFormat('EEE, MMM d, yyyy')
-                    .format(DateTime.parse(meeting.date))),
-            _buildInfoRow(LucideIcons.clock, meeting.time),
-            const SizedBox(height: 16),
-            if (meeting.images.isNotEmpty)
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  _buildInfoRow(LucideIcons.mapPin, meeting.place),
+                  const SizedBox(height: 8),
+                  _buildInfoRow(
+                      LucideIcons.calendar,
+                      DateFormat('EEE, MMM d, yyyy')
+                          .format(DateTime.parse(meeting.date))),
+                  const SizedBox(height: 8),
+                  _buildInfoRow(LucideIcons.clock, meeting.time),
+                ],
+              ),
+            ),
+            if (meeting.images.isNotEmpty) ...[
+              const SizedBox(height: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(LucideIcons.image, size: 16, color: Colors.grey[500]),
+                      Icon(LucideIcons.image, size: 16, color: Colors.grey[600]),
                       const SizedBox(width: 8),
                       Text(
                         'Meeting Photos',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      ...meeting.images.take(3).map((imgUrl) => Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: Image.file(
-                                File(imgUrl), // Assuming imgUrl is a local file path
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
-                                  width: 48,
-                                  height: 48,
-                                  color: Colors.grey[200],
-                                  child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
-                                ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 60,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: meeting.images.length > 4 ? 4 : meeting.images.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        if (index == 3 && meeting.images.length > 4) {
+                          return Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '+${meeting.images.length - 3}',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[700]),
                               ),
                             ),
-                          )),
-                      if (meeting.images.length > 3)
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.grey[200]!),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '+${meeting.images.length - 3}',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[600]),
+                          );
+                        }
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            File(meeting.images[index]),
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              width: 60,
+                              height: 60,
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
                             ),
                           ),
-                        ),
-                    ],
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 16),
                 ],
               ),
+            ],
+            const SizedBox(height: 20),
             if (showActions && meeting.status == "0" && meeting.toMid == fromMID)
               Row(
                 children: [
@@ -1786,16 +2075,17 @@ class MeetingCard extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                         ),
+                        elevation: 0,
                       ),
                       icon: const Icon(LucideIcons.check, size: 16),
-                      label: const Text('Accept', style: TextStyle(fontSize: 14)),
+                      label: const Text('Accept', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => onReject?.call(meeting.one2oneId),
@@ -1803,13 +2093,14 @@ class MeetingCard extends StatelessWidget {
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black,
                         side: BorderSide(color: Colors.grey[300]!),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                         ),
+                        elevation: 0,
                       ),
                       icon: const Icon(LucideIcons.x, size: 16),
-                      label: const Text('Decline', style: TextStyle(fontSize: 14)),
+                      label: const Text('Decline', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ],
@@ -1822,20 +2113,21 @@ class MeetingCard extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
                     ),
+                    elevation: 0,
                   ),
                   icon: const Icon(LucideIcons.checkCircle, size: 16),
-                  label: const Text('Mark as Completed', style: TextStyle(fontSize: 14)),
+                  label: const Text('Mark as Completed', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 ),
               ),
             if (showSentStatus && meeting.status == "0")
               Align(
                 alignment: Alignment.bottomRight,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.amber[100],
                     borderRadius: BorderRadius.circular(20),
@@ -1845,7 +2137,7 @@ class MeetingCard extends StatelessWidget {
                     'Awaiting Response',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: Colors.amber[700],
                     ),
                   ),
@@ -1858,20 +2150,21 @@ class MeetingCard extends StatelessWidget {
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Colors.blueGrey[600]),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[600]),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -1891,33 +2184,38 @@ class MemberCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => onTap(member),
-      child: Card(
-        elevation: 2, // Added subtle shadow
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12), // Slightly more rounded
-          side: BorderSide(color: Colors.grey[200]!),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 50,
+                    height: 50,
                     decoration: BoxDecoration(
                       color: Colors.black,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
                       child: Text(
                         member.name.isNotEmpty ? member.name[0].toUpperCase() : '',
                         style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 14,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -1930,12 +2228,19 @@ class MemberCard extends StatelessWidget {
                         Text(
                           member.name,
                           style: const TextStyle(
-                              fontWeight: FontWeight.w500, fontSize: 16),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.black),
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           member.email,
-                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -1943,20 +2248,50 @@ class MemberCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                member.number,
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.phone, size: 12, color: Colors.grey[600]),
+                    const SizedBox(width: 6),
+                    Text(
+                      member.number,
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const Spacer(), // Pushes the button to the bottom
-              Align(
-                alignment: Alignment.bottomRight,
-                child: TextButton.icon(
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
                   onPressed: () => onTap(member),
-                  icon: Icon(LucideIcons.userPlus, size: 16, color: Colors.blueGrey[600]),
-                  label: Text(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(LucideIcons.userPlus, size: 16),
+                  label: const Text(
                     'Send Request',
-                    style: TextStyle(fontSize: 12, color: Colors.blueGrey[600]),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -1968,7 +2303,7 @@ class MemberCard extends StatelessWidget {
   }
 }
 
-// Custom Dotted Border Container for image upload area
+// Custom Dotted Border Container
 class DottedBorderContainer extends StatelessWidget {
   final Widget child;
 
@@ -1977,13 +2312,14 @@ class DottedBorderContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         border: Border.all(
           color: Colors.grey[300]!,
           width: 2,
         ),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey[50],
       ),
       child: Center(child: child),
     );

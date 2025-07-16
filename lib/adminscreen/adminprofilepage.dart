@@ -41,7 +41,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final gId = prefs.getString('G_ID') ?? '461430';
-      
+
       if (gId.isEmpty) {
         setState(() {
           error = 'Invalid G_ID: G_ID is empty';
@@ -50,6 +50,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
         if (kDebugMode) {
           print('Error: $error');
         }
+        await clearPreferences();
         return;
       }
 
@@ -58,7 +59,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
       }
 
       final response = await http.get(
-        Uri.parse('https://tagai.caxis.ca/public/api/group-master')
+        Uri.parse('https://tagai.caxis.ca/public/api/group-master'),
       );
 
       if (response.statusCode == 200) {
@@ -96,8 +97,13 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
           return;
         }
 
+        if (kDebugMode) {
+          print('Group List: ${jsonEncode(groupList)}');
+          print('Searching for G_ID: $gId');
+        }
+
         final group = groupList.firstWhere(
-          (item) => item['Grop_code']?.toString() == gId,
+          (item) => item['G_ID']?.toString() == gId,
           orElse: () => null,
         );
 
@@ -120,6 +126,10 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
           if (kDebugMode) {
             print('Error: $error');
           }
+          await clearPreferences();
+          _showSnackBar('Invalid group ID. Please log in again.', isError: true);
+          // Optionally navigate to login screen
+          // Navigator.pushReplacementNamed(context, '/login');
         }
       } else {
         setState(() {
@@ -205,6 +215,39 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
       setState(() {
         isSaving = false;
       });
+    }
+  }
+
+  Future<void> clearPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('M_ID');
+      await prefs.remove('Name');
+      await prefs.remove('email');
+      await prefs.remove('number');
+      await prefs.remove('Grop_code');
+      await prefs.remove('G_ID');
+      await prefs.remove('role_id');
+      await prefs.remove('group_name');
+      await prefs.remove('short_group_name');
+      if (kDebugMode) {
+        print('Shared preferences cleared');
+      }
+      setState(() {
+        profile = null;
+        emailController.clear();
+        numberController.clear();
+        groupCodeController.clear();
+        isLoading = true;
+        error = null;
+      });
+      await fetchProfile();
+      _showSnackBar('Preferences cleared successfully', isError: false);
+    } catch (e) {
+      _showSnackBar('Error clearing preferences: $e', isError: true);
+      if (kDebugMode) {
+        print('Error clearing preferences: $e');
+      }
     }
   }
 
@@ -331,6 +374,13 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
             fontWeight: FontWeight.w600,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white, size: 20),
+            onPressed: clearPreferences,
+            tooltip: 'Logout',
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(
