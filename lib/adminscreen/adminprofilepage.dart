@@ -374,13 +374,6 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white, size: 20),
-            onPressed: clearPreferences,
-            tooltip: 'Logout',
-          ),
-        ],
       ),
       body: isLoading
           ? const Center(

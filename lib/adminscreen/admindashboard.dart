@@ -140,14 +140,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             }
           }
         } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Invalid API response format'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+          
         }
       } else {
         if (mounted) {
@@ -200,7 +193,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case Feature.members:
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const MembersPage()),
+          MaterialPageRoute(builder: (context) => const MemberDetailPage()),
         );
         break;
       case Feature.events:

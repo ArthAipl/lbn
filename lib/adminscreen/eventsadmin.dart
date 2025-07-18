@@ -15,6 +15,14 @@ class _EventsAdminPageState extends State<EventsAdminPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String? userGId;
+  String? mId;
+  String? name;
+  String? email;
+  String? number;
+  String? groupCode;
+  String? roleId;
+  String? groupName;
+  String? shortGroupName;
 
   @override
   void initState() {
@@ -25,11 +33,19 @@ class _EventsAdminPageState extends State<EventsAdminPage>
 
   Future<void> _loadUserData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
       setState(() {
-        userGId = prefs.getString('user_id');
+        userGId = prefs.getString('G_ID');
+        mId = prefs.getString('M_ID');
+        name = prefs.getString('Name');
+        email = prefs.getString('email');
+        number = prefs.getString('number');
+        groupCode = prefs.getString('Grop_code');
+        roleId = prefs.getString('role_id');
+        groupName = prefs.getString('group_name');
+        shortGroupName = prefs.getString('short_group_name');
       });
-      debugPrint('Loaded user G_ID: $userGId');
+      debugPrint('Loaded user data: G_ID=$userGId, M_ID=$mId, Name=$name, Email=$email, Number=$number, Group_Code=$groupCode, Role_ID=$roleId, Group_Name=$groupName, Short_Group_Name=$shortGroupName');
     } catch (e) {
       debugPrint('Error loading user data: $e');
     }
@@ -93,10 +109,10 @@ class CreateEventTab extends StatefulWidget {
 }
 
 class _CreateEventTabState extends State<CreateEventTab> {
-  final _formKey = GlobalKey<FormState>();
-  final _eventNameController = TextEditingController();
-  final _eventDescController = TextEditingController();
-  final _placeController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _eventNameController = TextEditingController();
+  final TextEditingController _eventDescController = TextEditingController();
+  final TextEditingController _placeController = TextEditingController();
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
@@ -119,7 +135,7 @@ class _CreateEventTabState extends State<CreateEventTab> {
     });
     try {
       debugPrint('Fetching fees categories from API...');
-      final response = await http.get(
+      final http.Response response = await http.get(
         Uri.parse('https://tagai.caxis.ca/public/api/fees-categories'),
         headers: {
           'Content-Type': 'application/json',
@@ -242,11 +258,11 @@ class _CreateEventTabState extends State<CreateEventTab> {
     });
 
     try {
-      final timeString = '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}';
+      final String timeString = '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}';
 
       debugPrint('Formatted time string: $timeString');
 
-      final eventData = {
+      final Map<String, dynamic> eventData = {
         'Event_Name': _eventNameController.text.trim(),
         'Event_Date': DateFormat('yyyy-MM-dd').format(_selectedDate!),
         'Event_time': timeString,
@@ -260,7 +276,7 @@ class _CreateEventTabState extends State<CreateEventTab> {
 
       debugPrint('Creating event with data: ${json.encode(eventData)}');
 
-      final response = await http.post(
+      final http.Response response = await http.post(
         Uri.parse('https://tagai.caxis.ca/public/api/event-cals'),
         headers: {
           'Content-Type': 'application/json',
@@ -278,20 +294,18 @@ class _CreateEventTabState extends State<CreateEventTab> {
         _clearForm();
       } else if (response.statusCode == 422) {
         try {
-          final errorData = json.decode(response.body);
+          final dynamic errorData = json.decode(response.body);
           debugPrint('Validation errors: $errorData');
 
           String errorMessage = 'Validation failed:\n';
           if (errorData is Map) {
             if (errorData.containsKey('errors')) {
-              final errors = errorData['errors'];
-              if (errors is Map) {
-                errors.forEach((field, messages) {
-                  if (messages is List) {
-                    errorMessage += '• $field: ${messages.join(', ')}\n';
-                  }
-                });
-              }
+              final Map<String, dynamic> errors = errorData['errors'];
+              errors.forEach((field, messages) {
+                if (messages is List) {
+                  errorMessage += '• $field: ${messages.join(', ')}\n';
+                }
+              });
             } else if (errorData.containsKey('message')) {
               errorMessage = errorData['message'];
             }
@@ -304,7 +318,7 @@ class _CreateEventTabState extends State<CreateEventTab> {
       } else {
         String errorMessage = 'Failed to create event (Status: ${response.statusCode})';
         try {
-          final errorData = json.decode(response.body);
+          final dynamic errorData = json.decode(response.body);
           if (errorData is Map && errorData.containsKey('message')) {
             errorMessage = errorData['message'];
           }
@@ -791,7 +805,7 @@ class _AllEventsTabState extends State<AllEventsTab> {
 
     try {
       debugPrint('Fetching events for G_ID: ${widget.userGId}');
-      final response = await http.get(
+      final http.Response response = await http.get(
         Uri.parse('https://tagai.caxis.ca/public/api/event-cals'),
         headers: {
           'Content-Type': 'application/json',
@@ -814,7 +828,7 @@ class _AllEventsTabState extends State<AllEventsTab> {
           throw Exception('Unexpected response format');
         }
 
-        final filteredEvents = data
+        final List<Map<String, dynamic>> filteredEvents = data
             .cast<Map<String, dynamic>>()
             .where((event) => event['G_ID'].toString() == widget.userGId)
             .toList();
@@ -941,8 +955,8 @@ class _AllEventsTabState extends State<AllEventsTab> {
         padding: const EdgeInsets.all(20),
         itemCount: _events.length,
         itemBuilder: (context, index) {
-          final event = _events[index];
-          final feesCategory = event['fees_category'];
+          final Map<String, dynamic> event = _events[index];
+          final Map<String, dynamic>? feesCategory = event['fees_category'];
 
           return Container(
             margin: const EdgeInsets.only(bottom: 16),
@@ -997,7 +1011,7 @@ class _AllEventsTabState extends State<AllEventsTab> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Date and Time Row - Fixed overflow
+                      // Date and Time Row
                       Row(
                         children: [
                           Container(
@@ -1055,7 +1069,7 @@ class _AllEventsTabState extends State<AllEventsTab> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Location Row - Fixed overflow
+                      // Location Row
                       Row(
                         children: [
                           Container(
@@ -1204,10 +1218,10 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
     });
 
     try {
-      final eventCalId = widget.event['Ev_Cal_Id'];
+      final String? eventCalId = widget.event['Ev_Cal_Id']?.toString();
       debugPrint('Fetching event tracks for Ev_Cal_Id: $eventCalId');
 
-      final response = await http.get(
+      final http.Response response = await http.get(
         Uri.parse('https://tagai.caxis.ca/public/api/event-tracks'),
         headers: {
           'Content-Type': 'application/json',
@@ -1230,16 +1244,16 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
           throw Exception('Unexpected response format');
         }
 
-        final filteredTracks = data
+        final List<Map<String, dynamic>> filteredTracks = data
             .cast<Map<String, dynamic>>()
-            .where((track) => track['Ev_Cal_Id'].toString() == eventCalId.toString())
+            .where((track) => track['Ev_Cal_Id'].toString() == eventCalId)
             .toList();
 
-        final attending = filteredTracks
+        final List<Map<String, dynamic>> attending = filteredTracks
             .where((track) => track['Status'].toString() == '1')
             .toList();
 
-        final notAttending = filteredTracks
+        final List<Map<String, dynamic>> notAttending = filteredTracks
             .where((track) => track['Status'].toString() == '2')
             .toList();
 
@@ -1278,7 +1292,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
   }
 
   Widget _buildMemberCard(Map<String, dynamic> member, bool isAttending) {
-    final memberData = member['member'];
+    final Map<String, dynamic>? memberData = member['member'];
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -1286,7 +1300,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isAttending 
+          color: isAttending
               ? const Color(0xFF10B981).withOpacity(0.3)
               : const Color(0xFFEF4444).withOpacity(0.3),
         ),
@@ -1297,7 +1311,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: isAttending 
+              color: isAttending
                   ? const Color(0xFF10B981).withOpacity(0.1)
                   : const Color(0xFFEF4444).withOpacity(0.1),
               borderRadius: BorderRadius.circular(24),
@@ -1324,7 +1338,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                 if (memberData != null && memberData['Mobile'] != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    memberData['Mobile'],
+                    memberData['Mobile'].toString(),
                     style: const TextStyle(
                       fontSize: 14,
                       color: Color(0xFF6B7280),
@@ -1339,7 +1353,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isAttending 
+              color: isAttending
                   ? const Color(0xFF10B981)
                   : const Color(0xFFEF4444),
               borderRadius: BorderRadius.circular(20),
@@ -1360,7 +1374,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final feesCategory = widget.event['fees_category'];
+    final Map<String, dynamic>? feesCategory = widget.event['fees_category'];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -1440,7 +1454,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Date and Time - Fixed overflow
+                  // Date and Time
                   Row(
                     children: [
                       Container(

@@ -41,7 +41,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/check-auth': (context) => const AuthCheckPage(),
         '/one-to-one-admin': (context) => const OneToOneAdmin(),
-        '/login': (context) => const LoginPage(),
+    
       },
     );
   }
@@ -111,117 +111,6 @@ class AuthCheckPage extends StatelessWidget {
     final userId = prefs.getString('user_id');
     debugPrint('AuthCheck: User ID exists: ${userId != null}, Value: $userId');
     return userId != null;
-  }
-}
-
-class LoginPage extends StatelessWidget {
-  const LoginPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    debugPrint('LoginPage: Displaying login screen');
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        title: const Text(
-          'Login',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Center(
-        child: Container(
-          padding: const EdgeInsets.all(32),
-          margin: const EdgeInsets.symmetric(horizontal: 24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.lock_outline,
-                  size: 48,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Login Required',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Please log in to access the One-to-One Admin page',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.black54,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    debugPrint('LoginPage: Setting dummy user data');
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setString('user_id', '1');
-                    await prefs.setString('user_name', 'AIPL');
-                    await prefs.setString('user_phone', '1122334455');
-                    await prefs.setString('user_email', 'aipl@gmail.com');
-                    await prefs.setString('user_role', '2');
-                    await prefs.setString('group_code', '461430');
-                    debugPrint('LoginPage: Dummy user data set: user_id=1, group_code=461430');
-                    Navigator.pushReplacementNamed(context, '/one-to-one-admin');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
-                  child: const Text(
-                    'Login with Dummy Data (Test)',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -326,7 +215,7 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
         debugPrint('Key: $key, Value: ${prefs.get(key)}');
       }
 
-      final gId = prefs.getString('group_code');
+      final gId = prefs.getString('Grop_code');
       if (gId == null) {
         debugPrint('Error: Group code not found in SharedPreferences');
         throw Exception('Please log in to continue');
@@ -346,8 +235,9 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
       final filteredMeetings = meetingsData
           .where((meeting) {
             final groupCode = meeting['group']?['Grop_code']?.toString();
-            debugPrint('fetchData: Meeting group code: $groupCode, Expected: $gId');
-            return groupCode == gId;
+            final matches = groupCode == gId;
+            debugPrint('fetchData: Meeting group code: $groupCode, Expected: $gId, Matches: $matches');
+            return matches;
           })
           .map((meeting) => Meeting.fromJson(meeting))
           .toList();
@@ -367,8 +257,9 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
           .where((member) {
             final groupCode = member['Grop_code']?.toString();
             final status = member['status']?.toString() ?? member['Status']?.toString();
-            debugPrint('fetchData: Member group code: $groupCode, Status: $status, Expected group_code: $gId, Status: 1');
-            return groupCode == gId && status == '1';
+            final matches = groupCode == gId && status == '1';
+            debugPrint('fetchData: Member group code: $groupCode, Status: $status, Expected group_code: $gId, Status: 1, Matches: $matches');
+            return matches;
           })
           .map((member) {
             final meetingCount = filteredMeetings
@@ -580,23 +471,22 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-  backgroundColor: Colors.black,
-  elevation: 0,
-  leading: IconButton(
-    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-    onPressed: () {
-      Navigator.pop(context); // Go back to the previous screen
-    },
-  ),
-  title: const Text(
-    'One-to-One Admin',
-    style: TextStyle(
-      color: Colors.white,
-      fontWeight: FontWeight.w600,
-    ),
-  ),
-),
-
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        title: const Text(
+          'One-to-One Admin',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
       body: Column(
         children: [
           Container(
