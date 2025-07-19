@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:lbn/adminscreen/admincircle.dart';
 import 'package:lbn/adminscreen/adminonetoone.dart';
+import 'package:lbn/adminscreen/adminrefrences.dart';
 import 'package:lbn/adminscreen/adminvisitors.dart';
 import 'package:lbn/adminscreen/eventsadmin.dart';
 import 'package:lbn/adminscreen/grupmembers.dart';
@@ -237,11 +238,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         );
         break;
       case Feature.references: // Handle new feature
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('References feature coming soon!'),
-            backgroundColor: Colors.blue,
-          ),
+         Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) =>  ReferencesAdmin()),
         );
         break;
     }
