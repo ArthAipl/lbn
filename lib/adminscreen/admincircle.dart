@@ -3,42 +3,54 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class Meeting {
-  final String one2oneId;
+  final String circleId;
   final String place;
   final String date;
   final String time;
   final String status;
   final Member fromMember;
-  final Member toMember;
+  final List<Member> toMembers;
   final String groupName;
   final String createdAt;
   final String updatedAt;
 
   Meeting({
-    required this.one2oneId,
+    required this.circleId,
     required this.place,
     required this.date,
     required this.time,
     required this.status,
     required this.fromMember,
-    required this.toMember,
+    required this.toMembers,
     required this.groupName,
     required this.createdAt,
     required this.updatedAt,
   });
 
   factory Meeting.fromJson(Map<String, dynamic> json) {
+    final fromMemberData = json['from_member'] as Map<String, dynamic>?;
+    final fromMember = fromMemberData != null
+        ? Member.fromJson(fromMemberData, meetingCount: 0)
+        : Member(mId: '', name: 'Unknown', email: '', meetingCount: 0);
+
+    final toMembersData = json['toMembers'] as List? ?? [];
+    final parsedToMembers = toMembersData
+        .whereType<Map<String, dynamic>>()
+        .map((memberJson) => Member.fromJson(memberJson, meetingCount: 0))
+        .toList();
+
     return Meeting(
-      one2oneId: json['one2one_id'].toString(),
-      place: json['Place'] ?? '',
-      date: json['Date'] ?? '',
-      time: json['Time'] ?? '',
+      circleId: json['Circle_ID'].toString(),
+      place: json['place'] ?? '',
+      date: json['date'] ?? '',
+      time: json['time'] ?? '',
       status: json['Status'].toString(),
-      fromMember: Member.fromJson(json['from_member']),
-      toMember: Member.fromJson(json['to_member']),
-      groupName: json['group']?['group_name'] ?? '',
+      fromMember: fromMember,
+      toMembers: parsedToMembers,
+      groupName: json['G_ID']?.toString() ?? '',
       createdAt: json['created_at'] ?? '',
       updatedAt: json['updated_at'] ?? '',
     );
@@ -55,137 +67,126 @@ class Member {
     required this.mId,
     required this.name,
     required this.email,
-    this.meetingCount = 0,
+    required this.meetingCount,
   });
 
   factory Member.fromJson(Map<String, dynamic> json, {int meetingCount = 0}) {
     return Member(
       mId: json['M_ID'].toString(),
-      name: json['Name'] ?? '',
+      name: json['Name'] ?? 'Unknown',
       email: json['email'] ?? '',
       meetingCount: meetingCount,
     );
   }
 }
 
-class OneToOneAdmin extends StatefulWidget {
-  const OneToOneAdmin({super.key});
-
+class CircleAdmin extends StatefulWidget {
+  const CircleAdmin({super.key});
   @override
-  State<OneToOneAdmin> createState() => _OneToOneAdminState();
+  State<CircleAdmin> createState() => _CircleAdminState();
 }
 
-class _OneToOneAdminState extends State<OneToOneAdmin> {
+class _CircleAdminState extends State<CircleAdmin> {
   List<Meeting> meetings = [];
   List<Member> members = [];
   bool isLoading = true;
   String? error;
-  bool _hasFetched = false;
-
   final Map<String, Map<String, dynamic>> statusMap = {
     '0': {'text': 'Pending', 'color': const Color(0xFFFFA726), 'textColor': Colors.white},
     '1': {'text': 'Accepted', 'color': const Color(0xFF66BB6A), 'textColor': Colors.white},
     '2': {'text': 'Rejected', 'color': const Color(0xFFEF5350), 'textColor': Colors.white},
     '3': {'text': 'Completed', 'color': const Color(0xFF9E9E9E), 'textColor': Colors.white},
-    '110': {'text': 'Custom Status', 'color': Colors.blue, 'textColor': Colors.white},
   };
 
   @override
   void initState() {
     super.initState();
-    debugPrint('OneToOneAdmin: initState called for widget hash: ${hashCode}');
+    debugPrint('CircleAdmin: initState called, fetching data');
     fetchData();
   }
 
   Future<void> fetchData() async {
-    if (_hasFetched) {
-      debugPrint('fetchData: Already fetched, skipping');
-      return;
-    }
-    _hasFetched = true;
-
     debugPrint('fetchData: Starting data fetch');
     setState(() {
       isLoading = true;
       error = null;
     });
-
     try {
       final prefs = await SharedPreferences.getInstance();
-      final groupId = prefs.getString('G_ID');
-      final groupCode = prefs.getString('Grop_code');
-      if (groupId == null) {
-        debugPrint('fetchData: Error: G_ID not found in SharedPreferences');
-        throw Exception('Please log in to continue (G_ID missing)');
+      final allKeys = prefs.getKeys();
+      debugPrint('SharedPreferences keys in fetchData: $allKeys');
+      for (var key in allKeys) {
+        debugPrint('Key: $key, Value: ${prefs.get(key)}');
       }
-      debugPrint('fetchData: Group ID: $groupId, Group Code: $groupCode');
+      final gId = prefs.getString('G_ID');
+      if (gId == null) {
+        debugPrint('Error: Group ID (G_ID) not found in SharedPreferences');
+        throw Exception('Please log in to continue');
+      }
+      debugPrint('fetchData: Group ID found: $gId');
 
-      // Fetch meetings
       debugPrint('fetchData: Fetching meetings from API');
-      final meetingsResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/one2one'));
+      final meetingsResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/circle-meetings'));
       if (meetingsResponse.statusCode != 200) {
-        debugPrint('fetchData: Error fetching meetings: ${meetingsResponse.statusCode}');
+        debugPrint('Error fetching meetings: ${meetingsResponse.statusCode} - ${meetingsResponse.reasonPhrase}');
         throw Exception('Failed to fetch meetings: ${meetingsResponse.statusCode}');
       }
-      final meetingsData = jsonDecode(meetingsResponse.body) as List;
+      debugPrint('fetchData: Meetings API raw response: ${meetingsResponse.body}');
+      final responseJson = jsonDecode(meetingsResponse.body) as Map<String, dynamic>;
+      final rawMeetingsData = responseJson['meetings'] as List? ?? [];
+      debugPrint('fetchData: Meetings API decoded (raw): $rawMeetingsData');
 
-      // Filter and parse meetings
-      final List<Meeting> allMeetings = meetingsData
-          .where((meeting) => meeting['group'] != null && meeting['group']['G_ID'] != null)
-          .map((meeting) => Meeting.fromJson(meeting))
+      final allParsedMeetings = rawMeetingsData
+          .whereType<Map<String, dynamic>>()
+          .map((meetingJson) => Meeting.fromJson(meetingJson))
           .toList();
 
-      // Filter meetings by G_ID (and optionally Grop_code)
-      final filteredMeetings = allMeetings.where((meeting) {
-        final rawMeetingData = meetingsData.firstWhere((m) => m['one2one_id'].toString() == meeting.one2oneId);
-        final actualMeetingGroupId = rawMeetingData['group']?['G_ID']?.toString();
-        final actualGroupCode = rawMeetingData['group']?['Grop_code']?.toString();
-        if (groupCode != null && actualGroupCode != groupCode) {
-          debugPrint('fetchData: Grop_code mismatch for meeting ${meeting.one2oneId}: Expected $groupCode, Got $actualGroupCode');
-        }
-        // Uncomment to enable Grop_code filtering
-        // final matches = actualMeetingGroupId == groupId && (groupCode == null || actualGroupCode == groupCode);
-        final matches = actualMeetingGroupId == groupId;
-        debugPrint('fetchData: Meeting ID: ${meeting.one2oneId}, G_ID: $actualMeetingGroupId, Matches: $matches');
-        return matches;
-      }).toList();
-      debugPrint('fetchData: Fetched ${filteredMeetings.length} meetings');
+      final filteredMeetingsForGroup = allParsedMeetings
+          .where((meeting) {
+            final matches = meeting.groupName == gId;
+            debugPrint('fetchData: Meeting G_ID: ${meeting.groupName}, Expected: $gId, Matches: $matches');
+            return matches;
+          })
+          .toList();
+      debugPrint('fetchData: Fetched ${filteredMeetingsForGroup.length} meetings for current group');
 
-      // Fetch members
       debugPrint('fetchData: Fetching members from API');
       final membersResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/member'));
       if (membersResponse.statusCode != 200) {
-        debugPrint('fetchData: Error fetching members: ${membersResponse.statusCode}');
+        debugPrint('Error fetching members: ${membersResponse.statusCode} - ${membersResponse.reasonPhrase}');
         throw Exception('Failed to fetch members: ${membersResponse.statusCode}');
       }
-      final membersData = jsonDecode(membersResponse.body)['members'] as List? ?? [];
+      debugPrint('fetchData: Members API raw response: ${membersResponse.body}');
+      final membersData = jsonDecode(membersResponse.body)['members'] as List? ?? jsonDecode(membersResponse.body) as List;
+      debugPrint('fetchData: Members API decoded: $membersData');
 
-      // Filter and parse members
-      final List<Member> fetchedMembers = [];
-      for (var memberJson in membersData) {
-        final memberGroupId = memberJson['G_ID']?.toString();
-        final memberStatus = memberJson['status']?.toString() ?? memberJson['Status']?.toString();
-        if (memberGroupId == groupId && memberStatus == '1') {
-          final meetingCount = filteredMeetings
-              .where((meeting) =>
-                  meeting.fromMember.mId == memberJson['M_ID'].toString() ||
-                  meeting.toMember.mId == memberJson['M_ID'].toString())
-              .length;
-          fetchedMembers.add(Member.fromJson(memberJson, meetingCount: meetingCount));
-        }
-      }
-      debugPrint('fetchData: Fetched ${fetchedMembers.length} members');
+      final filteredMembers = membersData
+          .where((member) {
+            final groupCode = member['G_ID']?.toString();
+            final status = member['status']?.toString() ?? member['Status']?.toString();
+            final matches = groupCode == gId && status == '1';
+            return matches;
+          })
+          .map((member) {
+            final memberId = member['M_ID'].toString();
+            final meetingCount = allParsedMeetings
+                .where((meeting) =>
+                    meeting.fromMember.mId == memberId ||
+                    meeting.toMembers.any((toM) => toM.mId == memberId))
+                .length;
+            return Member.fromJson(member, meetingCount: meetingCount);
+          })
+          .toList();
+      debugPrint('fetchData: Fetched ${filteredMembers.length} members');
 
       setState(() {
-        meetings = filteredMeetings;
-        members = fetchedMembers;
+        meetings = filteredMeetingsForGroup;
+        members = filteredMembers;
         isLoading = false;
-        debugPrint('Fetched Members: ${members.map((m) => m.name).toList()}');
-        debugPrint('Fetched Meetings: ${meetings.map((m) => "${m.one2oneId}: ${m.place}").toList()}');
       });
       debugPrint('fetchData: Data fetch completed successfully');
     } catch (e) {
-      debugPrint('fetchData: Error: $e');
+      debugPrint('Error in fetchData: $e');
       setState(() {
         error = e.toString();
         isLoading = false;
@@ -193,13 +194,31 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
     }
   }
 
-  void showMemberMeetings(Member member) {
+  Future<void> showMemberMeetings(Member member) async {
+    debugPrint('showMemberMeetings: Fetching meetings for member ${member.name}, M_ID: ${member.mId}');
     try {
-      final memberMeetings = meetings
-          .where((meeting) =>
-              meeting.fromMember.mId == member.mId || meeting.toMember.mId == member.mId)
+      final meetingsResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/circle-meetings'));
+      if (meetingsResponse.statusCode != 200) {
+        debugPrint('Error fetching meetings for member: ${meetingsResponse.statusCode} - ${meetingsResponse.reasonPhrase}');
+        throw Exception('Failed to fetch meetings: ${meetingsResponse.statusCode}');
+      }
+      debugPrint('showMemberMeetings: Meetings API raw response: ${meetingsResponse.body}');
+      final responseJson = jsonDecode(meetingsResponse.body) as Map<String, dynamic>;
+      final meetingsData = responseJson['meetings'] as List? ?? [];
+      debugPrint('showMemberMeetings: Meetings API decoded: $meetingsData');
+
+      final memberMeetings = meetingsData
+          .where((meeting) {
+            final fromMId = meeting['From_M_ID']?.toString();
+            final toMIds = (meeting['To_M_ID'] as List? ?? []).map((m) => m['id'].toString()).toList();
+            final matches = fromMId == member.mId || toMIds.contains(member.mId);
+            debugPrint('showMemberMeetings: Meeting From_M_ID: $fromMId, To_M_ID: $toMIds, Member M_ID: ${member.mId}, Matches: $matches');
+            return matches;
+          })
+          .map((meeting) => Meeting.fromJson(meeting))
           .toList();
-      debugPrint('showMemberMeetings: Navigating to MemberMeetingsPage for ${member.name} with ${memberMeetings.length} meetings');
+      debugPrint('showMemberMeetings: Fetched ${memberMeetings.length} meetings for ${member.name}');
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -211,16 +230,16 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
         ),
       );
     } catch (e) {
-      debugPrint('showMemberMeetings: Error: $e');
+      debugPrint('Error in showMemberMeetings: $e');
       setState(() {
-        error = 'Failed to show member meetings: $e';
+        error = 'Failed to fetch member meetings: $e';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('OneToOneAdmin: Building UI, isLoading: $isLoading, error: $error');
+    debugPrint('CircleAdmin: Building UI, isLoading: $isLoading, error: $error');
     if (isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
@@ -228,7 +247,7 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
           backgroundColor: Colors.black,
           elevation: 0,
           title: const Text(
-            'One-to-One Admin',
+            'Circle Admin',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w600,
@@ -260,14 +279,14 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
     }
     if (error != null) {
       final isAuthError = error!.contains('Please log in to continue');
-      debugPrint('OneToOneAdmin: Displaying error: $error, isAuthError: $isAuthError');
+      debugPrint('CircleAdmin: Displaying error: $error, isAuthError: $isAuthError');
       return Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
           backgroundColor: Colors.black,
           elevation: 0,
           title: const Text(
-            'One-to-One Admin',
+            'Circle Admin',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w600,
@@ -331,19 +350,18 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
                     onPressed: () {
                       try {
                         if (isAuthError) {
-                          debugPrint('OneToOneAdmin: Error button pressed, navigating to /login');
+                          debugPrint('CircleAdmin: Error button pressed, navigating to /login');
                           Navigator.pushReplacementNamed(context, '/login');
                         } else {
-                          debugPrint('OneToOneAdmin: Error button pressed, retrying fetchData');
+                          debugPrint('CircleAdmin: Error button pressed, retrying fetchData');
                           setState(() {
                             isLoading = true;
                             error = null;
-                            _hasFetched = false;
                           });
                           fetchData();
                         }
                       } catch (e) {
-                        debugPrint('OneToOneAdmin: Error in error button: $e');
+                        debugPrint('Error in error button: $e');
                         setState(() {
                           error = 'Failed to handle error: $e';
                         });
@@ -385,7 +403,7 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
           },
         ),
         title: const Text(
-          'One-to-One Admin',
+          'Circle Admin',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w600,
@@ -421,6 +439,7 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -743,14 +762,28 @@ class MemberMeetingsPage extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
-                                    child: Text(
-                                      meeting.place,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                        color: Colors.black87,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Location',
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          meeting.place,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                            color: Colors.black87,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -760,22 +793,105 @@ class MemberMeetingsPage extends StatelessWidget {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: statusMap[meeting.status]?['color'] ?? Colors.grey,
+                                      color: statusMap[meeting.status]!['color'],
                                       borderRadius: BorderRadius.circular(20),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: (statusMap[meeting.status]?['color'] ?? Colors.grey).withOpacity(0.3),
+                                          color: statusMap[meeting.status]!['color'].withOpacity(0.3),
                                           blurRadius: 4,
                                           offset: const Offset(0, 2),
                                         ),
                                       ],
                                     ),
                                     child: Text(
-                                      statusMap[meeting.status]?['text'] ?? 'Unknown',
+                                      statusMap[meeting.status]!['text'],
                                       style: TextStyle(
-                                        color: statusMap[meeting.status]?['textColor'] ?? Colors.white,
+                                        color: statusMap[meeting.status]!['textColor'],
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[50],
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'From Member',
+                                            style: TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            meeting.fromMember.name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                              color: Colors.black87,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[50],
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'To Member(s)',
+                                            style: TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          if (meeting.toMembers.isNotEmpty)
+                                            ...meeting.toMembers.map((toM) => Padding(
+                                              padding: const EdgeInsets.only(bottom: 2.0),
+                                              child: Text(
+                                                toM.name,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 14,
+                                                  color: Colors.black87,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            )).toList()
+                                          else
+                                            const Text(
+                                              'N/A',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ),
@@ -846,40 +962,6 @@ class MemberMeetingsPage extends StatelessWidget {
                                     ),
                                   ),
                                 ],
-                              ),
-                              const SizedBox(height: 16),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.03),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Meeting with',
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      meeting.fromMember.mId == member.mId
-                                          ? meeting.toMember.name
-                                          : meeting.fromMember.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: Colors.black87,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
                               ),
                             ],
                           ),

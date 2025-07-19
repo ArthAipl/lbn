@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:lbn/adminscreen/admincircle.dart';
 import 'package:lbn/adminscreen/adminonetoone.dart';
+import 'package:lbn/adminscreen/adminvisitors.dart';
 import 'package:lbn/adminscreen/eventsadmin.dart';
 import 'package:lbn/adminscreen/grupmembers.dart';
 import 'package:lbn/adminscreen/meetingsadmin.dart';
@@ -15,7 +17,6 @@ import 'dart:convert';
 class Group {
   final String gId;
   final String groupName;
-
   Group({required this.gId, required this.groupName});
 
   factory Group.fromJson(Map<String, dynamic> json) {
@@ -35,7 +36,9 @@ enum Feature {
   oneToOne,
   circleMeeting,
   committeeMembers,
-  profile
+  profile,
+  visitors, // Added new feature
+  references // Added new feature
 }
 
 class AdminDashboard extends StatefulWidget {
@@ -69,7 +72,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _loadUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-
       setState(() {
         userName = prefs.getString('Name') ?? '';
         userEmail = prefs.getString('email') ?? '';
@@ -77,11 +79,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         gId = prefs.getString('G_ID') ?? '';
         isLoading = false;
       });
-
       if (gId.isNotEmpty) {
         await _fetchGroupName();
       }
-
       if (userName.isEmpty && userEmail.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -112,7 +112,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final response = await http.get(
         Uri.parse('https://tagai.caxis.ca/public/api/group-master'),
       );
-
       if (response.statusCode == 200) {
         final jsonData = jsonDecode(response.body);
         if (jsonData is List) {
@@ -124,7 +123,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   orElse: () => Group(gId: gId, groupName: ''), // Return a default Group
                 )
               : null;
-
           if (group != null && mounted) {
             setState(() {
               groupName = group.groupName;
@@ -140,7 +138,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             }
           }
         } else {
-          
+          // Handle case where jsonData is not a List
         }
       } else {
         if (mounted) {
@@ -171,7 +169,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     } catch (e) {
       debugPrint('Error clearing preferences: $e');
     }
-
     if (mounted) {
       Navigator.pushReplacement(
         context,
@@ -182,7 +179,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   void _navigateToFeature(Feature feature) {
     _scaffoldKey.currentState?.closeDrawer();
-
     switch (feature) {
       case Feature.requests:
         Navigator.push(
@@ -215,11 +211,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         );
         break;
       case Feature.circleMeeting:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Circle Meeting feature coming soon!'),
-            backgroundColor: Colors.blue,
-          ),
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const CircleAdmin()),
         );
         break;
       case Feature.committeeMembers:
@@ -236,6 +230,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
           MaterialPageRoute(builder: (context) => const AdminProfilePage()),
         );
         break;
+      case Feature.visitors: // Handle new feature
+         Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const VisitorsAdmin()),
+        );
+        break;
+      case Feature.references: // Handle new feature
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('References feature coming soon!'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+        break;
     }
   }
 
@@ -249,7 +257,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
       );
     }
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
@@ -293,6 +300,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   title: 'My Profile',
                   onTap: () => _navigateToFeature(Feature.profile),
                 ),
+                // You can add more menu items here if needed
               ],
             ),
             Padding(
@@ -371,9 +379,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 
-
-4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );
   }
@@ -480,8 +486,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
       {'title': 'Meetings', 'icon': Icons.meeting_room_rounded, 'color': Colors.orange, 'feature': Feature.meetings},
       {'title': 'One 2 One', 'icon': Icons.person_pin_rounded, 'color': Colors.purple, 'feature': Feature.oneToOne},
       {'title': 'Circle Meeting Registration', 'icon': Icons.event_available_rounded, 'color': Colors.teal, 'feature': Feature.circleMeeting},
+      // New additions
+      {'title': 'Visitors', 'icon': Icons.visibility_rounded, 'color': Colors.red, 'feature': Feature.visitors},
+      {'title': 'References', 'icon': Icons.link_rounded, 'color': Colors.pink, 'feature': Feature.references},
     ];
-
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -509,7 +517,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       {'title': 'Secretary', 'icon': Icons.description_rounded, 'color': Colors.orange, 'feature': Feature.committeeMembers},
       {'title': 'Treasurer', 'icon': Icons.settings, 'color': Colors.purple, 'feature': Feature.committeeMembers},
     ];
-
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),

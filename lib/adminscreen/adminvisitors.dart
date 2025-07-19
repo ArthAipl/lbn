@@ -3,44 +3,61 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
-class Meeting {
-  final String one2oneId;
+class Visitor {
+  final String visitorId;
   final String place;
   final String date;
   final String time;
   final String status;
-  final Member fromMember;
-  final Member toMember;
+  final Member invitee;
+  final Member inviter;
   final String groupName;
   final String createdAt;
   final String updatedAt;
+  final String visitorName;
+  final String aboutVisitor;
+  final String visitorEmail;
+  final String visitorPhone;
 
-  Meeting({
-    required this.one2oneId,
+  Visitor({
+    required this.visitorId,
     required this.place,
     required this.date,
     required this.time,
     required this.status,
-    required this.fromMember,
-    required this.toMember,
+    required this.invitee,
+    required this.inviter,
     required this.groupName,
     required this.createdAt,
     required this.updatedAt,
+    required this.visitorName,
+    required this.aboutVisitor,
+    required this.visitorEmail,
+    required this.visitorPhone,
   });
 
-  factory Meeting.fromJson(Map<String, dynamic> json) {
-    return Meeting(
-      one2oneId: json['one2one_id'].toString(),
-      place: json['Place'] ?? '',
-      date: json['Date'] ?? '',
-      time: json['Time'] ?? '',
-      status: json['Status'].toString(),
-      fromMember: Member.fromJson(json['from_member']),
-      toMember: Member.fromJson(json['to_member']),
-      groupName: json['group']?['group_name'] ?? '',
+  factory Visitor.fromJson(Map<String, dynamic> json) {
+    final meeting = json['meeting'] ?? {};
+    final group = json['group'] ?? {};
+    final member = json['member'] ?? {};
+
+    return Visitor(
+      visitorId: json['vis_inv_id']?.toString() ?? '',
+      place: meeting['Place'] ?? '',
+      date: meeting['Meeting_Date'] ?? '',
+      time: meeting['Meeting_Time'] ?? '',
+      status: json['Visitor_Status']?.toString() ?? '0',
+      invitee: Member.fromJson(json, visitCount: 0), // Visitor as invitee
+      inviter: Member.fromJson(member, visitCount: 0), // Member as inviter
+      groupName: group['group_name'] ?? '',
       createdAt: json['created_at'] ?? '',
       updatedAt: json['updated_at'] ?? '',
+      visitorName: json['Visitor_Name'] ?? '',
+      aboutVisitor: json['About_Visitor'] ?? '',
+      visitorEmail: json['Visitor_Email'] ?? '',
+      visitorPhone: json['Visitor_Phone'] ?? '',
     );
   }
 }
@@ -49,143 +66,136 @@ class Member {
   final String mId;
   final String name;
   final String email;
-  final int meetingCount;
+  final int visitCount;
 
   Member({
     required this.mId,
     required this.name,
     required this.email,
-    this.meetingCount = 0,
+    this.visitCount = 0,
   });
 
-  factory Member.fromJson(Map<String, dynamic> json, {int meetingCount = 0}) {
+  factory Member.fromJson(Map<String, dynamic> json, {int visitCount = 0}) {
     return Member(
-      mId: json['M_ID'].toString(),
-      name: json['Name'] ?? '',
-      email: json['email'] ?? '',
-      meetingCount: meetingCount,
+      mId: json['M_ID']?.toString() ?? '',
+      name: json['Name'] ?? json['Visitor_Name'] ?? '',
+      email: json['email'] ?? json['Visitor_Email'] ?? '',
+      visitCount: visitCount,
     );
   }
 }
 
-class OneToOneAdmin extends StatefulWidget {
-  const OneToOneAdmin({super.key});
+class VisitorsAdmin extends StatefulWidget {
+  const VisitorsAdmin({super.key});
 
   @override
-  State<OneToOneAdmin> createState() => _OneToOneAdminState();
+  State<VisitorsAdmin> createState() => _VisitorsAdminState();
 }
 
-class _OneToOneAdminState extends State<OneToOneAdmin> {
-  List<Meeting> meetings = [];
+class _VisitorsAdminState extends State<VisitorsAdmin> {
+  List<Visitor> visitors = [];
   List<Member> members = [];
   bool isLoading = true;
   String? error;
-  bool _hasFetched = false;
 
   final Map<String, Map<String, dynamic>> statusMap = {
     '0': {'text': 'Pending', 'color': const Color(0xFFFFA726), 'textColor': Colors.white},
     '1': {'text': 'Accepted', 'color': const Color(0xFF66BB6A), 'textColor': Colors.white},
     '2': {'text': 'Rejected', 'color': const Color(0xFFEF5350), 'textColor': Colors.white},
     '3': {'text': 'Completed', 'color': const Color(0xFF9E9E9E), 'textColor': Colors.white},
-    '110': {'text': 'Custom Status', 'color': Colors.blue, 'textColor': Colors.white},
+    '110': {'text': 'Unknown Status', 'color': Colors.blueGrey, 'textColor': Colors.white},
   };
 
   @override
   void initState() {
     super.initState();
-    debugPrint('OneToOneAdmin: initState called for widget hash: ${hashCode}');
+    debugPrint('VisitorsAdmin: initState called, fetching data');
     fetchData();
   }
 
   Future<void> fetchData() async {
-    if (_hasFetched) {
-      debugPrint('fetchData: Already fetched, skipping');
-      return;
-    }
-    _hasFetched = true;
-
     debugPrint('fetchData: Starting data fetch');
     setState(() {
       isLoading = true;
       error = null;
     });
-
     try {
       final prefs = await SharedPreferences.getInstance();
+      // Clear unnecessary SharedPreferences keys
+      await prefs.remove('Name');
+      await prefs.remove('email');
+      await prefs.remove('number');
+      await prefs.remove('Grop_code');
+      await prefs.remove('role_id');
+      await prefs.remove('group_name');
+      await prefs.remove('short_group_name');
+
       final groupId = prefs.getString('G_ID');
-      final groupCode = prefs.getString('Grop_code');
       if (groupId == null) {
-        debugPrint('fetchData: Error: G_ID not found in SharedPreferences');
+        debugPrint('Error: G_ID not found in SharedPreferences');
         throw Exception('Please log in to continue (G_ID missing)');
       }
-      debugPrint('fetchData: Group ID: $groupId, Group Code: $groupCode');
+      debugPrint('fetchData: Group ID found: $groupId');
 
-      // Fetch meetings
-      debugPrint('fetchData: Fetching meetings from API');
-      final meetingsResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/one2one'));
-      if (meetingsResponse.statusCode != 200) {
-        debugPrint('fetchData: Error fetching meetings: ${meetingsResponse.statusCode}');
-        throw Exception('Failed to fetch meetings: ${meetingsResponse.statusCode}');
+      // Fetch visitors
+      debugPrint('fetchData: Fetching visitors from API');
+      final visitorsResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/visitor-invites'));
+      if (visitorsResponse.statusCode != 200) {
+        debugPrint('Error fetching visitors: ${visitorsResponse.statusCode} - ${visitorsResponse.reasonPhrase}');
+        throw Exception('Failed to fetch visitors: ${visitorsResponse.statusCode}');
       }
-      final meetingsData = jsonDecode(meetingsResponse.body) as List;
+      debugPrint('fetchData: Visitors API raw response: ${visitorsResponse.body}');
+      final visitorsData = jsonDecode(visitorsResponse.body) as List;
+      debugPrint('fetchData: Visitors API decoded: $visitorsData');
 
-      // Filter and parse meetings
-      final List<Meeting> allMeetings = meetingsData
-          .where((meeting) => meeting['group'] != null && meeting['group']['G_ID'] != null)
-          .map((meeting) => Meeting.fromJson(meeting))
-          .toList();
+      final List<Visitor> allVisitors = visitorsData.map((visitor) => Visitor.fromJson(visitor)).toList();
 
-      // Filter meetings by G_ID (and optionally Grop_code)
-      final filteredMeetings = allMeetings.where((meeting) {
-        final rawMeetingData = meetingsData.firstWhere((m) => m['one2one_id'].toString() == meeting.one2oneId);
-        final actualMeetingGroupId = rawMeetingData['group']?['G_ID']?.toString();
-        final actualGroupCode = rawMeetingData['group']?['Grop_code']?.toString();
-        if (groupCode != null && actualGroupCode != groupCode) {
-          debugPrint('fetchData: Grop_code mismatch for meeting ${meeting.one2oneId}: Expected $groupCode, Got $actualGroupCode');
-        }
-        // Uncomment to enable Grop_code filtering
-        // final matches = actualMeetingGroupId == groupId && (groupCode == null || actualGroupCode == groupCode);
-        final matches = actualMeetingGroupId == groupId;
-        debugPrint('fetchData: Meeting ID: ${meeting.one2oneId}, G_ID: $actualMeetingGroupId, Matches: $matches');
+      final filteredVisitors = allVisitors.where((visitor) {
+        final rawVisitorData = visitorsData.firstWhere(
+          (v) => v['vis_inv_id'].toString() == visitor.visitorId,
+          orElse: () => {},
+        );
+        final actualVisitorGroupId = rawVisitorData['group']?['G_ID']?.toString();
+        final matches = actualVisitorGroupId == groupId;
+        debugPrint('fetchData: Visitor G_ID: $actualVisitorGroupId, Expected: $groupId, Matches: $matches');
         return matches;
       }).toList();
-      debugPrint('fetchData: Fetched ${filteredMeetings.length} meetings');
+      debugPrint('fetchData: Fetched ${filteredVisitors.length} visitors');
 
       // Fetch members
       debugPrint('fetchData: Fetching members from API');
       final membersResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/member'));
       if (membersResponse.statusCode != 200) {
-        debugPrint('fetchData: Error fetching members: ${membersResponse.statusCode}');
+        debugPrint('Error fetching members: ${membersResponse.statusCode} - ${membersResponse.reasonPhrase}');
         throw Exception('Failed to fetch members: ${membersResponse.statusCode}');
       }
-      final membersData = jsonDecode(membersResponse.body)['members'] as List? ?? [];
+      debugPrint('fetchData: Members API raw response: ${membersResponse.body}');
+      final membersData = jsonDecode(membersResponse.body)['members'] as List? ?? jsonDecode(membersResponse.body) as List;
+      debugPrint('fetchData: Members API decoded: $membersData');
 
-      // Filter and parse members
       final List<Member> fetchedMembers = [];
       for (var memberJson in membersData) {
         final memberGroupId = memberJson['G_ID']?.toString();
         final memberStatus = memberJson['status']?.toString() ?? memberJson['Status']?.toString();
         if (memberGroupId == groupId && memberStatus == '1') {
-          final meetingCount = filteredMeetings
-              .where((meeting) =>
-                  meeting.fromMember.mId == memberJson['M_ID'].toString() ||
-                  meeting.toMember.mId == memberJson['M_ID'].toString())
+          final visitCount = filteredVisitors
+              .where((visitor) =>
+                  visitor.invitee.mId == memberJson['M_ID'].toString() ||
+                  visitor.inviter.mId == memberJson['M_ID'].toString())
               .length;
-          fetchedMembers.add(Member.fromJson(memberJson, meetingCount: meetingCount));
+          fetchedMembers.add(Member.fromJson(memberJson, visitCount: visitCount));
         }
       }
       debugPrint('fetchData: Fetched ${fetchedMembers.length} members');
 
       setState(() {
-        meetings = filteredMeetings;
+        visitors = filteredVisitors;
         members = fetchedMembers;
         isLoading = false;
-        debugPrint('Fetched Members: ${members.map((m) => m.name).toList()}');
-        debugPrint('Fetched Meetings: ${meetings.map((m) => "${m.one2oneId}: ${m.place}").toList()}');
       });
       debugPrint('fetchData: Data fetch completed successfully');
     } catch (e) {
-      debugPrint('fetchData: Error: $e');
+      debugPrint('Error in fetchData: $e');
       setState(() {
         error = e.toString();
         isLoading = false;
@@ -193,34 +203,48 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
     }
   }
 
-  void showMemberMeetings(Member member) {
+  Future<void> logout() async {
+    debugPrint('logout: Clearing SharedPreferences');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('Name');
+    await prefs.remove('email');
+    await prefs.remove('number');
+    await prefs.remove('Grop_code');
+    await prefs.remove('role_id');
+    await prefs.remove('group_name');
+    await prefs.remove('short_group_name');
+    debugPrint('logout: Navigating to login screen');
+    Navigator.pushReplacementNamed(context, '/login');
+  }
+
+  void showMemberVisits(Member member) {
     try {
-      final memberMeetings = meetings
-          .where((meeting) =>
-              meeting.fromMember.mId == member.mId || meeting.toMember.mId == member.mId)
+      final memberVisits = visitors
+          .where((visitor) =>
+              visitor.invitee.mId == member.mId || visitor.inviter.mId == member.mId)
           .toList();
-      debugPrint('showMemberMeetings: Navigating to MemberMeetingsPage for ${member.name} with ${memberMeetings.length} meetings');
+      debugPrint('showMemberVisits: Navigating to MemberVisitsPage for ${member.name} with ${memberVisits.length} Visitors');
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => MemberMeetingsPage(
+          builder: (context) => MemberVisitsPage(
             member: member,
-            meetings: memberMeetings,
+            visitors: memberVisits,
             statusMap: statusMap,
           ),
         ),
       );
     } catch (e) {
-      debugPrint('showMemberMeetings: Error: $e');
+      debugPrint('Error in showMemberVisits: $e');
       setState(() {
-        error = 'Failed to show member meetings: $e';
+        error = 'Failed to show member Visitors: $e';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('OneToOneAdmin: Building UI, isLoading: $isLoading, error: $error');
+    debugPrint('VisitorsAdmin: Building UI, isLoading: $isLoading, error: $error');
     if (isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
@@ -228,7 +252,7 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
           backgroundColor: Colors.black,
           elevation: 0,
           title: const Text(
-            'One-to-One Admin',
+            'Visitors Admin',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w600,
@@ -260,14 +284,14 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
     }
     if (error != null) {
       final isAuthError = error!.contains('Please log in to continue');
-      debugPrint('OneToOneAdmin: Displaying error: $error, isAuthError: $isAuthError');
+      debugPrint('VisitorsAdmin: Displaying error: $error, isAuthError: $isAuthError');
       return Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
           backgroundColor: Colors.black,
           elevation: 0,
           title: const Text(
-            'One-to-One Admin',
+            'Visitors Admin',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w600,
@@ -331,19 +355,18 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
                     onPressed: () {
                       try {
                         if (isAuthError) {
-                          debugPrint('OneToOneAdmin: Error button pressed, navigating to /login');
+                          debugPrint('VisitorsAdmin: Error button pressed, navigating to /login');
                           Navigator.pushReplacementNamed(context, '/login');
                         } else {
-                          debugPrint('OneToOneAdmin: Error button pressed, retrying fetchData');
+                          debugPrint('VisitorsAdmin: Error button pressed, retrying fetchData');
                           setState(() {
                             isLoading = true;
                             error = null;
-                            _hasFetched = false;
                           });
                           fetchData();
                         }
                       } catch (e) {
-                        debugPrint('OneToOneAdmin: Error in error button: $e');
+                        debugPrint('Error in error button: $e');
                         setState(() {
                           error = 'Failed to handle error: $e';
                         });
@@ -385,7 +408,7 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
           },
         ),
         title: const Text(
-          'One-to-One Admin',
+          'Visitors Admin',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w600,
@@ -417,7 +440,7 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'View members and their scheduled meetings',
+                  'View members and their visitor invites',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 12,
@@ -483,7 +506,7 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: InkWell(
-                          onTap: () => showMemberMeetings(member),
+                          onTap: () => showMemberVisits(member),
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
                             padding: const EdgeInsets.all(20),
@@ -544,7 +567,7 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    '${member.meetingCount} meeting${member.meetingCount != 1 ? 's' : ''}',
+                                    '${member.visitCount} visit${member.visitCount != 1 ? 's' : ''}',
                                     style: const TextStyle(
                                       color: Colors.black54,
                                       fontSize: 12,
@@ -566,28 +589,28 @@ class _OneToOneAdminState extends State<OneToOneAdmin> {
   }
 }
 
-class MemberMeetingsPage extends StatelessWidget {
+class MemberVisitsPage extends StatelessWidget {
   final Member member;
-  final List<Meeting> meetings;
+  final List<Visitor> visitors;
   final Map<String, Map<String, dynamic>> statusMap;
 
-  const MemberMeetingsPage({
+  const MemberVisitsPage({
     super.key,
     required this.member,
-    required this.meetings,
+    required this.visitors,
     required this.statusMap,
   });
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('MemberMeetingsPage: Building for ${member.name} with ${meetings.length} meetings');
+    debugPrint('MemberVisitsPage: Building for ${member.name} with ${visitors.length} Visitors');
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
         title: Text(
-          '${member.name}\'s Meetings',
+          '${member.name}\'s Visitors',
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w600,
@@ -600,7 +623,7 @@ class MemberMeetingsPage extends StatelessWidget {
             size: 20,
           ),
           onPressed: () {
-            debugPrint('MemberMeetingsPage: Back button pressed');
+            debugPrint('MemberVisitsPage: Back button pressed');
             Navigator.pop(context);
           },
         ),
@@ -656,7 +679,7 @@ class MemberMeetingsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${meetings.length} meeting${meetings.length != 1 ? 's' : ''}',
+                        '${visitors.length} Visitors${visitors.length != 1 ? 's' : ''}',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 16,
@@ -669,7 +692,7 @@ class MemberMeetingsPage extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: meetings.isEmpty
+            child: visitors.isEmpty
                 ? Center(
                     child: Container(
                       padding: const EdgeInsets.all(32),
@@ -695,7 +718,7 @@ class MemberMeetingsPage extends StatelessWidget {
                           ),
                           SizedBox(height: 16),
                           Text(
-                            'No meetings found',
+                            'No Visitors found',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -704,7 +727,7 @@ class MemberMeetingsPage extends StatelessWidget {
                           ),
                           SizedBox(height: 8),
                           Text(
-                            'This member has no scheduled meetings',
+                            'This member has no scheduled Visitors',
                             style: TextStyle(
                               color: Colors.black38,
                               fontSize: 14,
@@ -717,10 +740,10 @@ class MemberMeetingsPage extends StatelessWidget {
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: meetings.length,
+                    itemCount: visitors.length,
                     itemBuilder: (context, index) {
-                      final meeting = meetings[index];
-                      debugPrint('Building meeting card: ${meeting.place}, index: $index');
+                      final visitor = visitors[index];
+                      debugPrint('Building visitor card: ${visitor.place}, index: $index');
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(
@@ -744,7 +767,7 @@ class MemberMeetingsPage extends StatelessWidget {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      meeting.place,
+                                      visitor.place,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 18,
@@ -760,26 +783,58 @@ class MemberMeetingsPage extends StatelessWidget {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: statusMap[meeting.status]?['color'] ?? Colors.grey,
+                                      color: statusMap[visitor.status]?['color'] ?? Colors.grey,
                                       borderRadius: BorderRadius.circular(20),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: (statusMap[meeting.status]?['color'] ?? Colors.grey).withOpacity(0.3),
+                                          color: (statusMap[visitor.status]?['color'] ?? Colors.grey).withOpacity(0.3),
                                           blurRadius: 4,
                                           offset: const Offset(0, 2),
                                         ),
                                       ],
                                     ),
                                     child: Text(
-                                      statusMap[meeting.status]?['text'] ?? 'Unknown',
+                                      statusMap[visitor.status]?['text'] ?? 'Unknown',
                                       style: TextStyle(
-                                        color: statusMap[meeting.status]?['textColor'] ?? Colors.white,
+                                        color: statusMap[visitor.status]?['textColor'] ?? Colors.white,
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
                                 ],
+                              ),
+                              const SizedBox(height: 16),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.03),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Meeting Location',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      visitor.place,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
                               ),
                               const SizedBox(height: 16),
                               Row(
@@ -804,7 +859,7 @@ class MemberMeetingsPage extends StatelessWidget {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            meeting.date,
+                                            visitor.date,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w600,
                                               fontSize: 14,
@@ -835,7 +890,7 @@ class MemberMeetingsPage extends StatelessWidget {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            meeting.time,
+                                            visitor.time,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w600,
                                               fontSize: 14,
@@ -859,7 +914,7 @@ class MemberMeetingsPage extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text(
-                                      'Meeting with',
+                                      'Invited',
                                       style: TextStyle(
                                         color: Colors.grey,
                                         fontSize: 12,
@@ -868,13 +923,38 @@ class MemberMeetingsPage extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      meeting.fromMember.mId == member.mId
-                                          ? meeting.toMember.name
-                                          : meeting.fromMember.name,
+                                      visitor.visitorName,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
                                         color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'About: ${visitor.aboutVisitor}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Email: ${visitor.visitorEmail}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Phone: ${visitor.visitorPhone}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),

@@ -37,7 +37,6 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
     try {
       final prefs = await SharedPreferences.getInstance();
       debugPrint('Saving user data to SharedPreferences');
-
       // TODO: Replace with actual API call to fetch user data
       // Example:
       // final userData = await fetchUserDataFromApi();
@@ -52,7 +51,6 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
         'group_name': 'Aark Infosoft Pvt Ltd', // Match API response
         'short_group_name': 'Aark', // Match API response
       };
-
       // Save user data to SharedPreferences
       String roleId = userData['role_id']?.toString() ?? '';
       String? mId = userData['m_id']?.toString();
@@ -62,7 +60,6 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
       await prefs.setString('Grop_code', userData['group_code']?.toString() ?? '');
       await prefs.setString('G_ID', userData['g_id']?.toString() ?? '');
       await prefs.setString('role_id', roleId);
-
       if (roleId == '3') {
         await prefs.setString('M_ID', mId ?? '');
         debugPrint('Saved M_ID: $mId for member role');
@@ -72,19 +69,16 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
         await prefs.setString('short_group_name', userData['short_group_name']?.toString() ?? '');
         debugPrint('Saved admin fields: group_name and short_group_name');
       }
-
       // Log all SharedPreferences for debugging
       final allKeys = prefs.getKeys();
       debugPrint('SharedPreferences contents:');
       for (var key in allKeys) {
         debugPrint('$key: ${prefs.getString(key)}');
       }
-
       setState(() {
         gId = prefs.getString('G_ID');
         debugPrint('Retrieved G_ID: $gId');
       });
-
       if (gId == null) {
         debugPrint('Error: G_ID not found in SharedPreferences');
         if (mounted) {
@@ -97,7 +91,6 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
         });
         return;
       }
-
       debugPrint('G_ID found, proceeding to fetch meetings');
       await _fetchMeetings();
     } catch (e) {
@@ -119,7 +112,6 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
       final response = await http.get(
         Uri.parse('https://tagai.caxis.ca/public/api/meeting-cals'),
       );
-
       debugPrint('Received response with status code: ${response.statusCode}');
       debugPrint('Raw API response: ${response.body}');
       if (response.statusCode == 200) {
@@ -167,6 +159,7 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: const Text('Meetings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        // No back arrow here as it's the root page
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
@@ -193,7 +186,6 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
 class CreateMeetingTab extends StatefulWidget {
   final String? gId;
   final VoidCallback onMeetingCreated;
-
   const CreateMeetingTab({super.key, required this.gId, required this.onMeetingCreated});
 
   @override
@@ -337,113 +329,143 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
     debugPrint('Building CreateMeetingTab, gId: ${widget.gId}');
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextFormField(
-              controller: _placeController,
-              decoration: const InputDecoration(
-                labelText: 'Meeting Place',
-                icon: Icon(Icons.place),
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) => value!.isEmpty ? 'Enter a place' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _locationController,
-              decoration: const InputDecoration(
-                labelText: 'Location Details',
-                icon: Icon(Icons.location_on),
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) => value!.isEmpty ? 'Enter a location' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _dateController,
-              readOnly: true,
-              onTap: () => _selectDate(context),
-              decoration: const InputDecoration(
-                labelText: 'Meeting Date',
-                icon: Icon(Icons.calendar_today),
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) => value!.isEmpty ? 'Select a date' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _timeController,
-              readOnly: true,
-              onTap: () => _selectTime(context),
-              decoration: const InputDecoration(
-                labelText: 'Meeting Time',
-                icon: Icon(Icons.access_time),
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) => value!.isEmpty ? 'Select a time' : null,
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedSchedule,
-              hint: const Text('Select schedule'),
-              items: schedules
-                  .map((schedule) => DropdownMenuItem(value: schedule, child: Text(schedule)))
-                  .toList(),
-              onChanged: (value) => setState(() {
-                _selectedSchedule = value;
-                debugPrint('Selected schedule: $value');
-              }),
-              decoration: const InputDecoration(
-                labelText: 'Schedule',
-                icon: Icon(Icons.schedule),
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) => value == null ? 'Select a schedule' : null,
-            ),
-            const SizedBox(height: 16),
-            const Text('Presentation Slots', style: TextStyle(fontWeight: FontWeight.bold)),
-            Row(
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: RadioListTile<int>(
-                    value: 1,
-                    groupValue: _selectedSlot,
-                    onChanged: (value) => setState(() {
-                      _selectedSlot = value;
-                      debugPrint('Selected slot: $value');
-                    }),
-                    title: const Text('1'),
+                TextFormField(
+                  controller: _placeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Meeting Place',
+                    prefixIcon: Icon(Icons.place, color: Colors.black54),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                      borderSide: BorderSide(color: Colors.black, width: 2),
+                    ),
                   ),
+                  validator: (value) => value!.isEmpty ? 'Enter a place' : null,
                 ),
-                Expanded(
-                  child: RadioListTile<int>(
-                    value: 2,
-                    groupValue: _selectedSlot,
-                    onChanged: (value) => setState(() {
-                      _selectedSlot = value;
-                      debugPrint('Selected slot: $value');
-                    }),
-                    title: const Text('2'),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _locationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Location Details',
+                    prefixIcon: Icon(Icons.location_on, color: Colors.black54),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                      borderSide: BorderSide(color: Colors.black, width: 2),
+                    ),
                   ),
+                  validator: (value) => value!.isEmpty ? 'Enter a location' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _dateController,
+                  readOnly: true,
+                  onTap: () => _selectDate(context),
+                  decoration: const InputDecoration(
+                    labelText: 'Meeting Date',
+                    prefixIcon: Icon(Icons.calendar_today, color: Colors.black54),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                      borderSide: BorderSide(color: Colors.black, width: 2),
+                    ),
+                  ),
+                  validator: (value) => value!.isEmpty ? 'Select a date' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _timeController,
+                  readOnly: true,
+                  onTap: () => _selectTime(context),
+                  decoration: const InputDecoration(
+                    labelText: 'Meeting Time',
+                    prefixIcon: Icon(Icons.access_time, color: Colors.black54),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                      borderSide: BorderSide(color: Colors.black, width: 2),
+                    ),
+                  ),
+                  validator: (value) => value!.isEmpty ? 'Select a time' : null,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedSchedule,
+                  hint: const Text('Select schedule'),
+                  items: schedules
+                      .map((schedule) => DropdownMenuItem(value: schedule, child: Text(schedule)))
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _selectedSchedule = value;
+                    debugPrint('Selected schedule: $value');
+                  }),
+                  decoration: const InputDecoration(
+                    labelText: 'Schedule',
+                    prefixIcon: Icon(Icons.schedule, color: Colors.black54),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                      borderSide: BorderSide(color: Colors.black, width: 2),
+                    ),
+                  ),
+                  validator: (value) => value == null ? 'Select a schedule' : null,
+                ),
+                const SizedBox(height: 24),
+                const Text('Presentation Slots', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<int>(
+                        value: 1,
+                        groupValue: _selectedSlot,
+                        onChanged: (value) => setState(() {
+                          _selectedSlot = value;
+                          debugPrint('Selected slot: $value');
+                        }),
+                        title: const Text('1'),
+                        activeColor: Colors.black,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<int>(
+                        value: 2,
+                        groupValue: _selectedSlot,
+                        onChanged: (value) => setState(() {
+                          _selectedSlot = value;
+                          debugPrint('Selected slot: $value');
+                        }),
+                        title: const Text('2'),
+                        activeColor: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: isLoading ? null : _createMeeting,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('Create Meeting', style: TextStyle(fontSize: 18)),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: isLoading ? null : _createMeeting,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 50),
-              ),
-              child: isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Create Meeting'),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -454,7 +476,6 @@ class AllMeetingsTab extends StatelessWidget {
   final List<dynamic> meetings;
   final bool isLoading;
   final VoidCallback onRefresh;
-
   const AllMeetingsTab({super.key, required this.meetings, required this.isLoading, required this.onRefresh});
 
   @override
@@ -478,23 +499,89 @@ class AllMeetingsTab extends StatelessWidget {
                       debugPrint('Error parsing date for meeting ${meeting['M_C_Id']}: $e');
                     }
                     return Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.event),
-                        title: Text(meeting['Place'] ?? 'Unknown Place'),
-                        subtitle: Text(formattedDate),
-                        trailing: Text(meeting['Attn_Status'] == '1' ? 'Confirmed' : 'Pending'),
+                      margin: const EdgeInsets.symmetric(vertical: 8.0),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: InkWell(
                         onTap: () {
-                          debugPrint('Navigating to VisitorsPage for meeting ${meeting['M_C_Id']}');
+                          debugPrint('Navigating to MeetingDetailsPage for meeting ${meeting['M_C_Id']}');
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => VisitorsPage(
-                                meetingId: meeting['M_C_Id'].toString(),
-                                meetingTitle: meeting['Place'] ?? 'Meeting',
+                              builder: (context) => MeetingDetailsPage(
+                                meeting: meeting, // Pass the entire meeting object
                               ),
                             ),
                           );
                         },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.event, color: Colors.black87),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      meeting['Place'] ?? 'Unknown Place',
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: meeting['Attn_Status'] == '1' ? Colors.green[100] : Colors.orange[100],
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Text(
+                                      meeting['Attn_Status'] == '1' ? 'Confirmed' : 'Pending',
+                                      style: TextStyle(
+                                        color: meeting['Attn_Status'] == '1' ? Colors.green[800] : Colors.orange[800],
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.calendar_today, size: 16, color: Colors.black54),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    formattedDate,
+                                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                  ),
+                                  const SizedBox(width: 15),
+                                  const Icon(Icons.access_time, size: 16, color: Colors.black54),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    meeting['Meeting_Time'] ?? 'N/A',
+                                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on, size: 16, color: Colors.black54),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      meeting['G_Location'] ?? 'No location details',
+                                      style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -503,36 +590,46 @@ class AllMeetingsTab extends StatelessWidget {
   }
 }
 
-class VisitorsPage extends StatefulWidget {
-  final String meetingId;
-  final String meetingTitle;
-
-  const VisitorsPage({super.key, required this.meetingId, required this.meetingTitle});
+// MeetingDetailsPage
+class MeetingDetailsPage extends StatefulWidget {
+  final dynamic meeting;
+  const MeetingDetailsPage({super.key, required this.meeting});
 
   @override
-  State<VisitorsPage> createState() => _VisitorsPageState();
+  State<MeetingDetailsPage> createState() => _MeetingDetailsPageState();
 }
 
-class _VisitorsPageState extends State<VisitorsPage> {
+class _MeetingDetailsPageState extends State<MeetingDetailsPage> with SingleTickerProviderStateMixin {
   List<dynamic> visitors = [];
+  List<dynamic> presentations = [];
   bool isLoadingVisitors = true;
+  bool isLoadingPresentations = true;
+  late TabController _detailTabController;
 
   @override
   void initState() {
     super.initState();
-    debugPrint('Initializing VisitorsPage for meetingId: ${widget.meetingId}');
+    _detailTabController = TabController(length: 2, vsync: this);
+    debugPrint('Initializing MeetingDetailsPage for meetingId: ${widget.meeting['M_C_Id']}');
     _fetchVisitors();
+    _fetchPresentations();
+  }
+
+  @override
+  void dispose() {
+    _detailTabController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchVisitors() async {
-    debugPrint('Starting _fetchVisitors for meetingId: ${widget.meetingId}');
+    debugPrint('Starting _fetchVisitors for meetingId: ${widget.meeting['M_C_Id']}');
     try {
       final response = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/visitor-invites'));
       debugPrint('Visitors response status: ${response.statusCode}, Body: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          visitors = data.where((visitor) => visitor['M_C_Id'].toString() == widget.meetingId).toList();
+          visitors = data.where((visitor) => visitor['M_C_Id'].toString() == widget.meeting['M_C_Id'].toString()).toList();
           isLoadingVisitors = false;
         });
         debugPrint('Visitors fetched successfully: ${visitors.length} found');
@@ -549,34 +646,239 @@ class _VisitorsPageState extends State<VisitorsPage> {
     }
   }
 
+  Future<void> _fetchPresentations() async {
+    debugPrint('Starting _fetchPresentations for meetingId: ${widget.meeting['M_C_Id']}');
+    try {
+      final response = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/pres-tracks'));
+      debugPrint('Presentations response status: ${response.statusCode}, Body: ${response.body}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          presentations = data.where((pres) => pres['M_C_Id'].toString() == widget.meeting['M_C_Id'].toString()).toList();
+          isLoadingPresentations = false;
+        });
+        debugPrint('Presentations fetched successfully: ${presentations.length} found');
+        debugPrint('Filtered presentations: $presentations');
+      } else {
+        throw Exception('Failed to load presentations. Status: ${response.statusCode}, Body: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error fetching presentations: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading presentations: $e')));
+      }
+      setState(() => isLoadingPresentations = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    debugPrint('Building VisitorsPage, isLoadingVisitors: $isLoadingVisitors');
+    String formattedDate = 'N/A';
+    try {
+      formattedDate = DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.meeting['Meeting_Date']));
+    } catch (e) {
+      debugPrint('Error parsing date for meeting details: $e');
+    }
+
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('Visitors'),
+        title: const Text('Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), // Changed title to 'Details'
+        leading: IconButton( // Added iOS-style back arrow
+          icon: const Icon(Icons.arrow_back_ios),
+          onPressed: () => Navigator.pop(context),
+        ),
+        bottom: TabBar(
+          controller: _detailTabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.grey[400],
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          tabs: const [
+            Tab(text: 'Visitors'),
+            Tab(text: 'Presentations'),
+          ],
+        ),
       ),
-      body: isLoadingVisitors
-          ? const Center(child: CircularProgressIndicator())
-          : visitors.isEmpty
-              ? const Center(child: Text('No visitors found'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: visitors.length,
-                  itemBuilder: (context, index) {
-                    final visitor = visitors[index];
-                    return Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.person),
-                        title: Text(visitor['Visitor_Name'] ?? 'Unknown'),
-                        subtitle: Text(visitor['Visitor_Email'] ?? 'No email'),
-                        trailing: Text(visitor['Status'] ?? 'Pending'),
-                      ),
-                    );
-                  },
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.meeting['Place'] ?? 'Unknown Place',
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 20, color: Colors.black54),
+                        const SizedBox(width: 8),
+                        Text(
+                          formattedDate,
+                          style: const TextStyle(fontSize: 16, color: Colors.black87),
+                        ),
+                        const SizedBox(width: 20),
+                        const Icon(Icons.access_time, size: 20, color: Colors.black54),
+                        const SizedBox(width: 8),
+                        Text(
+                          widget.meeting['Meeting_Time'] ?? 'N/A',
+                          style: const TextStyle(fontSize: 16, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.location_on, size: 20, color: Colors.black54),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.meeting['G_Location'] ?? 'No location details provided.',
+                            style: const TextStyle(fontSize: 16, color: Colors.black87),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.schedule, size: 20, color: Colors.black54),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Schedule: ${widget.meeting['schedule'] ?? 'N/A'}',
+                          style: const TextStyle(fontSize: 16, color: Colors.black87),
+                        ),
+                        const SizedBox(width: 20),
+                        const Icon(Icons.slideshow, size: 20, color: Colors.black54),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Slot: ${widget.meeting['slot'] ?? 'N/A'}',
+                          style: const TextStyle(fontSize: 16, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 20, color: Colors.black54),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Status: ${widget.meeting['Attn_Status'] == '1' ? 'Confirmed' : 'Pending'}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: widget.meeting['Attn_Status'] == '1' ? Colors.green[700] : Colors.orange[700],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _detailTabController,
+              children: [
+                // Visitors Tab
+                isLoadingVisitors
+                    ? const Center(child: CircularProgressIndicator())
+                    : visitors.isEmpty
+                        ? const Center(child: Text('No visitors found for this meeting.'))
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16.0),
+                            itemCount: visitors.length,
+                            itemBuilder: (context, index) {
+                              final visitor = visitors[index];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                child: ListTile(
+                                  leading: const CircleAvatar(
+                                    backgroundColor: Colors.black,
+                                    child: Icon(Icons.person, color: Colors.white),
+                                  ),
+                                  title: Text(
+                                    visitor['Visitor_Name'] ?? 'Unknown Visitor',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Text(visitor['Visitor_Email'] ?? 'No email provided'),
+                                  trailing: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: visitor['Status'] == 'Confirmed' ? Colors.green[100] : Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Text(
+                                      visitor['Status'] ?? 'Pending',
+                                      style: TextStyle(
+                                        color: visitor['Status'] == 'Confirmed' ? Colors.green[800] : Colors.grey[800],
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                // Presentations Tab
+                isLoadingPresentations
+                    ? const Center(child: CircularProgressIndicator())
+                    : presentations.isEmpty
+                        ? const Center(child: Text('No presentations found for this meeting.'))
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16.0),
+                            itemCount: presentations.length,
+                            itemBuilder: (context, index) {
+                              final presentation = presentations[index];
+                              final member = presentation['member']; // Access the nested 'member' object
+
+                              final presenterName = member != null ? member['Name'] ?? 'Unknown Presenter' : 'Unknown Presenter';
+                              final presenterEmail = member != null ? member['email'] ?? 'N/A' : 'N/A';
+                              final presenterNumber = member != null ? member['number'] ?? 'N/A' : 'N/A';
+
+                              return Card(
+                                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                child: ListTile(
+                                  leading: const CircleAvatar(
+                                    backgroundColor: Colors.black,
+                                    child: Icon(Icons.person, color: Colors.white),
+                                  ),
+                                  title: Text(
+                                    presenterName,
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Email: $presenterEmail'),
+                                      Text('Number: $presenterNumber'),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
