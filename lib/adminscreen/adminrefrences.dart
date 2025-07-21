@@ -21,6 +21,8 @@ class Reference {
   final String referenceEmail;
   final String referencePhone;
   final String toMid;
+  final String? thankNoteGiverName;
+  final String? thankNoteAmount;
 
   Reference({
     required this.referenceId,
@@ -38,9 +40,11 @@ class Reference {
     required this.referenceEmail,
     required this.referencePhone,
     required this.toMid,
+    this.thankNoteGiverName,
+    this.thankNoteAmount,
   });
 
-  factory Reference.fromJson(Map<dynamic, dynamic> json) {
+  factory Reference.fromJson(Map<dynamic, dynamic> json, {String? thankNoteGiverName, String? thankNoteAmount}) {
     final jsonStringKeys = json.map((key, value) => MapEntry(key.toString(), value));
     final meeting = jsonStringKeys['meeting'] as Map<dynamic, dynamic>? ?? {};
     final group = jsonStringKeys['group'] as Map<dynamic, dynamic>? ?? {};
@@ -63,6 +67,8 @@ class Reference {
       referenceEmail: jsonStringKeys['Email']?.toString() ?? '',
       referencePhone: jsonStringKeys['Phone']?.toString() ?? '',
       toMid: jsonStringKeys['To_MID']?.toString() ?? '',
+      thankNoteGiverName: thankNoteGiverName,
+      thankNoteAmount: thankNoteAmount,
     );
   }
 }
@@ -157,12 +163,42 @@ class _ReferencesAdminState extends State<ReferencesAdmin> {
           : (referencesJson['data'] as List? ?? referencesJson['references'] as List? ?? []);
       debugPrint('fetchData: References API decoded: $rawReferencesData');
 
+      // Fetch thank notes
+      debugPrint('fetchData: Fetching thank notes from API');
+      final thankNotesResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/thnk-tracks'));
+      if (thankNotesResponse.statusCode != 200) {
+        debugPrint('Error fetching thank notes: ${thankNotesResponse.statusCode} - ${thankNotesResponse.reasonPhrase}');
+        throw Exception('Failed to fetch thank notes: ${thankNotesResponse.statusCode}');
+      }
+      debugPrint('fetchData: Thank Notes API raw response: ${thankNotesResponse.body}');
+      final thankNotesJson = jsonDecode(thankNotesResponse.body);
+      final thankNotesData = (thankNotesJson is List)
+          ? thankNotesJson
+          : (thankNotesJson['data'] as List? ?? thankNotesJson['thnk-tracks'] as List? ?? []);
+      debugPrint('fetchData: Thank Notes API decoded: $thankNotesData');
+
       final List<Reference> allReferences = rawReferencesData.map((reference) {
         if (reference is! Map) {
           debugPrint('Invalid reference data: $reference');
           throw Exception('Invalid reference data format');
         }
-        return Reference.fromJson(reference);
+        // Find matching thank note
+        final matchingThankNote = thankNotesData.firstWhere(
+          (thankNote) => thankNote['ref_track_Id']?.toString() == reference['ref_track_id']?.toString(),
+          orElse: () => null,
+        );
+        String? thankNoteGiverName;
+        String? thankNoteAmount;
+        if (matchingThankNote != null) {
+          final memberData = matchingThankNote['member'] as Map<dynamic, dynamic>? ?? {};
+          thankNoteGiverName = memberData['Name']?.toString();
+          thankNoteAmount = matchingThankNote['Amount']?.toString();
+        }
+        return Reference.fromJson(
+          reference,
+          thankNoteGiverName: thankNoteGiverName,
+          thankNoteAmount: thankNoteAmount,
+        );
       }).toList();
 
       final filteredReferences = allReferences.where((reference) {
@@ -181,7 +217,7 @@ class _ReferencesAdminState extends State<ReferencesAdmin> {
       debugPrint('fetchData: Fetching members from API');
       final membersResponse = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/member'));
       if (membersResponse.statusCode != 200) {
-        debugPrint('Error fetching members: ${membersResponse.statusCode} - ${referencesResponse.reasonPhrase}');
+        debugPrint('Error fetching members: ${membersResponse.statusCode} - ${membersResponse.reasonPhrase}');
         throw Exception('Failed to fetch members: ${membersResponse.statusCode}');
       }
       debugPrint('fetchData: Members API raw response: ${membersResponse.body}');
@@ -310,7 +346,7 @@ class _ReferencesAdminState extends State<ReferencesAdmin> {
             ],
           ),
         ),
-      );
+    );
     }
     if (error != null) {
       final isAuthError = error!.contains('Please log in to continue');
@@ -883,6 +919,42 @@ class MemberReferencesPage extends StatelessWidget {
                                     const SizedBox(height: 4),
                                     Text(
                                       'Phone: ${reference.referencePhone}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Thank Note Details',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Giver: ${reference.thankNoteGiverName ?? 'N/A'}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Receiver: ${reference.inviter.name}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black54,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Amount: ${reference.thankNoteAmount ?? 'N/A'}',
                                       style: const TextStyle(
                                         fontSize: 14,
                                         color: Colors.black54,

@@ -14,7 +14,7 @@ class MemberApprovalScreen extends StatefulWidget {
 class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
   List<Member> members = [];
   bool isLoading = true;
-  bool _isUpdatingStatus = false; // Added for status update loading state
+  bool _isUpdatingStatus = false;
   String? groupCode;
   String errorMessage = '';
   int currentStatusFilter = 0; // 0 = pending, 1 = approved, 2 = rejected, -1 = all
@@ -30,15 +30,17 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
     try {
       debugPrint('Loading group code and members...');
       final prefs = await SharedPreferences.getInstance();
-      groupCode = prefs.getString('Grop_code'); // Updated to use Grop_code
+      groupCode = prefs.getString('Grop_code');
       debugPrint('Retrieved group code from SharedPreferences: $groupCode');
 
       if (groupCode == null || groupCode!.isEmpty) {
         debugPrint('No group code found in SharedPreferences');
         setState(() {
-          errorMessage = 'Group code not found. Please contact support.';
+          errorMessage = 'Group code not found. Please log in again.';
           isLoading = false;
         });
+        // Redirect to login screen
+        Navigator.pushReplacementNamed(context, '/login');
         return;
       }
 
@@ -105,7 +107,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
   }
 
   Future<void> _updateMemberStatus(Member member, int newStatus) async {
-    if (_isUpdatingStatus) return; // Debounce rapid updates
+    if (_isUpdatingStatus) return;
     try {
       debugPrint('Updating member ${member.id} status to $newStatus');
       setState(() => _isUpdatingStatus = true);
@@ -179,8 +181,6 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
       await prefs.remove('group_name');
       await prefs.remove('short_group_name');
       debugPrint('SharedPreferences cleared successfully');
-      // Navigate to login screen or reset app state
-      // Navigator.pushReplacementNamed(context, '/login'); // Uncomment and adjust route as needed
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Logged out successfully'),
@@ -192,6 +192,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         ),
       );
+      Navigator.pushReplacementNamed(context, '/login');
     } catch (e) {
       debugPrint('Error clearing SharedPreferences: ${e.toString()}');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -232,7 +233,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false, // Prevent resizing issues
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         leading: IconButton(
@@ -252,11 +253,14 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
         backgroundColor: Colors.black,
         elevation: 0,
         actions: [
-          
           PopupMenuButton<int>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) {
-              _changeStatusFilter(value);
+              if (value == -2) {
+                _logout();
+              } else {
+                _changeStatusFilter(value);
+              }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
@@ -274,6 +278,10 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
               const PopupMenuItem(
                 value: 2,
                 child: Text('Show Rejected Members'),
+              ),
+              const PopupMenuItem(
+                value: -2,
+                child: Text('Logout'),
               ),
             ],
           ),
@@ -616,5 +624,40 @@ class Member {
     if (value is String) return int.tryParse(value);
     if (value is bool) return value ? 1 : 0;
     return null;
+  }
+}
+
+Future<void> saveUserPreferences({
+  required String? mId,
+  required String name,
+  required String email,
+  required String number,
+  required String groupCode,
+  required String gId,
+  required String roleId,
+  Map<String, dynamic>? userData,
+}) async {
+  try {
+    if (groupCode.isEmpty) {
+      throw Exception('Group code cannot be empty');
+    }
+    final prefs = await SharedPreferences.getInstance();
+    if (roleId == '3') {
+      await prefs.setString('M_ID', mId ?? '');
+    }
+    await prefs.setString('Name', name);
+    await prefs.setString('email', email);
+    await prefs.setString('number', number);
+    await prefs.setString('Grop_code', groupCode);
+    await prefs.setString('G_ID', gId);
+    await prefs.setString('role_id', roleId);
+    if (roleId == '2') {
+      await prefs.setString('group_name', userData?['group_name']?.toString() ?? '');
+      await prefs.setString('short_group_name', userData?['short_group_name']?.toString() ?? '');
+    }
+    debugPrint('User preferences saved successfully: Grop_code=$groupCode');
+  } catch (e) {
+    debugPrint('Error saving SharedPreferences: ${e.toString()}');
+    throw Exception('Failed to save user preferences: ${e.toString()}');
   }
 }

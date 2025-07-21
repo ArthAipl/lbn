@@ -184,13 +184,16 @@ class _MemberDetailPageState extends State<MemberDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Ensure white background
+      backgroundColor: Theme.of(context).colorScheme.surface, // Use theme surface color
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Group Members'),
+        title: Text(
+          'Group Members',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
+        ),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -215,18 +218,19 @@ class _MemberDetailPageState extends State<MemberDetailPage> {
                       controller: _refreshController,
                       onRefresh: _onRefresh,
                       child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                         itemCount: members.length,
                         itemBuilder: (context, index) {
                           final member = members[index];
                           final memberId = member['M_ID']?.toString();
                           return Card(
-                            elevation: 2, // Lighter shadow for list items
+                            margin: const EdgeInsets.only(bottom: 12.0), // Spacing between cards
+                            elevation: 6, // Slightly more prominent shadow
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12.0), // Slightly less rounded for list cards
+                              borderRadius: BorderRadius.circular(16.0), // More rounded corners
                             ),
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(12.0),
+                              borderRadius: BorderRadius.circular(16.0),
                               onTap: () {
                                 if (memberId != null) {
                                   debugPrint('Tapped on member: ${member['Name']} with M_ID: $memberId');
@@ -244,21 +248,21 @@ class _MemberDetailPageState extends State<MemberDetailPage> {
                                 }
                               },
                               child: Padding(
-                                padding: const EdgeInsets.all(16.0), // Adjusted padding
+                                padding: const EdgeInsets.all(20.0), // Increased padding
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
                                         CircleAvatar(
-                                          radius: 24, // Slightly larger avatar
-                                          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                          radius: 28, // Larger avatar
+                                          backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.15),
                                           child: Text(
                                             member['Name'] != null && member['Name'].isNotEmpty
                                                 ? member['Name'][0].toUpperCase()
                                                 : '?',
                                             style: TextStyle(
-                                                fontSize: 20,
+                                                fontSize: 22,
                                                 fontWeight: FontWeight.bold,
                                                 color: Theme.of(context).colorScheme.primary),
                                           ),
@@ -267,25 +271,25 @@ class _MemberDetailPageState extends State<MemberDetailPage> {
                                         Expanded(
                                           child: Text(
                                             member['Name'] ?? 'Unknown',
-                                            style: Theme.of(context).textTheme.titleLarge, // Use titleLarge for names
+                                            style: Theme.of(context).textTheme.headlineSmall, // Use headlineSmall for names
                                           ),
                                         ),
                                         const Icon(LucideIcons.chevronRight, size: 24.0, color: Colors.grey),
                                       ],
                                     ),
-                                    const Divider(height: 24, thickness: 0.5, indent: 64, endIndent: 0), // Adjusted divider
+                                    const Divider(height: 28, thickness: 0.8, indent: 68, endIndent: 0), // Thicker divider
                                     _buildMemberInfoRow(
                                       icon: LucideIcons.mail,
                                       label: 'Email',
                                       value: member['email'] ?? 'N/A',
                                     ),
-                                    const SizedBox(height: 8.0), // Adjusted spacing
+                                    const SizedBox(height: 10.0), // Adjusted spacing
                                     _buildMemberInfoRow(
                                       icon: LucideIcons.phone,
                                       label: 'Number',
                                       value: member['number'] ?? 'N/A',
                                     ),
-                                    const SizedBox(height: 16.0), // Adjusted spacing
+                                    const SizedBox(height: 16.0),
                                     Align(
                                       alignment: Alignment.bottomRight,
                                       child: Text(
@@ -307,11 +311,11 @@ class _MemberDetailPageState extends State<MemberDetailPage> {
   Widget _buildMemberInfoRow({required IconData icon, required String label, required String value}) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: Colors.grey[600]), // Slightly larger icon
-        const SizedBox(width: 12), // Adjusted spacing
+        Icon(icon, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant), // Themed icon color
+        const SizedBox(width: 12),
         Text(
           '$label: ',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: Colors.black87),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
         ),
         Expanded(
           child: Text(
@@ -329,20 +333,20 @@ class _MemberDetailPageState extends State<MemberDetailPage> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Card(
-          elevation: 8,
+          elevation: 10, // More prominent shadow for the input card
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.0),
+            borderRadius: BorderRadius.circular(24.0), // More rounded
           ),
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(28.0), // Increased padding
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(LucideIcons.network, size: 80, color: Theme.of(context).colorScheme.primary), // Larger icon
-                const SizedBox(height: 24),
+                Icon(LucideIcons.network, size: 90, color: Theme.of(context).colorScheme.primary), // Larger icon
+                const SizedBox(height: 28),
                 Text(
                   'Enter Group ID',
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
@@ -351,29 +355,35 @@ class _MemberDetailPageState extends State<MemberDetailPage> {
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[700]),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 36),
                 TextField(
                   controller: _groupIdController,
                   keyboardType: TextInputType.text,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Group ID',
                     hintText: 'e.g., 12345',
-                    prefixIcon: Icon(LucideIcons.hash),
+                    prefixIcon: Icon(LucideIcons.hash, color: Theme.of(context).colorScheme.primary),
                   ),
                 ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: isLoading ? null : _saveGroupIdAndFetchMembers,
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.5,
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity, // Make button full width
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : _saveGroupIdAndFetchMembers,
+                    child: isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : Text(
+                            'Load Members',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.onPrimary),
                           ),
-                        )
-                      : const Text('Load Members'),
+                  ),
                 ),
               ],
             ),
@@ -486,20 +496,21 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
         children: [
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: Colors.black54),
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           GestureDetector(
             onTap: isLink ? onTap : null,
             child: TextFormField(
               readOnly: true,
               initialValue: displayValue,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: isLink ? Colors.blueAccent[700] : Colors.black87,
+                    color: isLink ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface,
                     decoration: isLink ? TextDecoration.underline : TextDecoration.none,
                   ),
               decoration: InputDecoration(
-                prefixIcon: icon != null ? Icon(icon, color: Colors.grey[600], size: 20) : null,
+                prefixIcon: icon != null ? Icon(icon, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20) : null,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
               ),
               maxLines: null, // Allow multiple lines for description
             ),
@@ -515,16 +526,16 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
     return Tooltip(
       message: tooltip,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24.0),
+        borderRadius: BorderRadius.circular(28.0), // Larger tap area
         onTap: () => _launchUrl(url),
         child: Container(
-          padding: const EdgeInsets.all(10.0),
+          padding: const EdgeInsets.all(12.0), // Increased padding
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withOpacity(0.15), // Slightly more opaque background
             shape: BoxShape.circle,
-            border: Border.all(color: color.withOpacity(0.3), width: 1.0),
+            border: Border.all(color: color.withOpacity(0.4), width: 1.2), // Thicker border
           ),
-          child: Icon(icon, size: 26, color: color),
+          child: Icon(icon, size: 28, color: color), // Larger icon
         ),
       ),
     );
@@ -533,14 +544,7 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Ensure white background
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text('Business Profile'),
-      ),
+      backgroundColor: Theme.of(context).colorScheme.surface, // Ensure white background
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : hasError
@@ -548,7 +552,7 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(LucideIcons.alertCircle, size: 60, color: Colors.redAccent[400]),
+                      Icon(LucideIcons.alertCircle, size: 60, color: Theme.of(context).colorScheme.error),
                       const SizedBox(height: 16),
                       Text(
                         'Failed to load business profile or no profile found.',
@@ -558,29 +562,26 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
                     ],
                   ),
                 )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Business Logo Section
-                      if (businessProfile!['logo'] != null && businessProfile!['logo'].isNotEmpty)
-                        Column(
+              : CustomScrollView(
+                  slivers: [
+                    SliverAppBar(
+                      expandedHeight: 250.0, // Height when expanded
+                      pinned: true, // Stays at the top
+                      flexibleSpace: FlexibleSpaceBar(
+                        centerTitle: true,
+                        titlePadding: const EdgeInsets.only(bottom: 16.0),
+                        title: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Text(
-                              'Business Logo',
-                              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: Colors.black54),
-                            ),
-                            const SizedBox(height: 12),
-                            Center(
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 24.0),
+                            if (businessProfile!['logo'] != null && businessProfile!['logo'].isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(18.0),
+                                    borderRadius: BorderRadius.circular(16.0),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.grey.withOpacity(0.2),
+                                        color: Colors.black.withOpacity(0.3),
                                         spreadRadius: 2,
                                         blurRadius: 8,
                                         offset: const Offset(0, 4),
@@ -588,88 +589,132 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
                                     ],
                                   ),
                                   child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(18.0),
+                                    borderRadius: BorderRadius.circular(16.0),
                                     child: Image.network(
                                       businessProfile!['logo'][0],
-                                      height: 120,
-                                      width: 120,
+                                      height: 80,
+                                      width: 80,
                                       fit: BoxFit.cover,
                                       errorBuilder: (context, error, stackTrace) =>
-                                          Icon(LucideIcons.imageOff, size: 80, color: Colors.grey[400]),
+                                          Icon(LucideIcons.imageOff, size: 60, color: Colors.grey[400]),
                                     ),
                                   ),
+                                ),
+                              ),
+                            Text(
+                              businessProfile!['Business_Name'] ?? 'Business Name Not Provided',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                        background: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black,
+                                Colors.grey[900]!,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Business Details Card
+                            Card(
+                              elevation: 6,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20.0),
+                              ),
+                              margin: const EdgeInsets.only(bottom: 20.0),
+                              child: Padding(
+                                padding: const EdgeInsets.all(24.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'About Business',
+                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                                    ),
+                                    const Divider(height: 24, thickness: 1),
+                                    _buildDisplayField(
+                                      'Description',
+                                      businessProfile!['busi_desc'],
+                                      icon: LucideIcons.info,
+                                    ),
+                                    _buildDisplayField(
+                                      'Services',
+                                      businessProfile!['services'],
+                                      icon: LucideIcons.briefcase,
+                                    ),
+                                    _buildDisplayField(
+                                      'Products',
+                                      businessProfile!['products'],
+                                      icon: LucideIcons.package,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Contact & Social Links Card
+                            Card(
+                              elevation: 6,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20.0),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(24.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Contact & Socials',
+                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                                    ),
+                                    const Divider(height: 24, thickness: 1),
+                                    _buildDisplayField(
+                                      'Website URL',
+                                      businessProfile!['weburl'],
+                                      icon: LucideIcons.globe,
+                                      onTap: () => _launchUrl(businessProfile!['weburl'] ?? ''),
+                                    ),
+                                    const SizedBox(height: 16.0),
+                                    Text(
+                                      'Social Links',
+                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 12.0),
+                                    Wrap(
+                                      spacing: 16.0,
+                                      runSpacing: 12.0,
+                                      children: [
+                                        _buildSocialIconButton(LucideIcons.facebook, Colors.blue[700]!,
+                                            businessProfile!['fblink'] ?? '', 'Facebook'),
+                                        _buildSocialIconButton(LucideIcons.instagram, Colors.purple[700]!,
+                                            businessProfile!['instalink'] ?? '', 'Instagram'),
+                                        _buildSocialIconButton(LucideIcons.send, Colors.lightBlue[700]!,
+                                            businessProfile!['tellink'] ?? '', 'Telegram'),
+                                        _buildSocialIconButton(LucideIcons.linkedin, Colors.blue[900]!,
+                                            businessProfile!['lilink'] ?? '', 'LinkedIn'),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      // Business Name
-                      Center(
-                        child: Text(
-                          businessProfile!['Business_Name'] ?? 'Business Name Not Provided',
-                          style: Theme.of(context).textTheme.headlineLarge, // Adjusted font size for "huge"
-                          textAlign: TextAlign.center,
-                        ),
                       ),
-                      const SizedBox(height: 20.0),
-                      // Business Details Card
-                      Card(
-                        elevation: 2, // Softer shadow for content card
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16.0),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(20.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildDisplayField(
-                                'Description',
-                                businessProfile!['busi_desc'],
-                                icon: LucideIcons.info,
-                              ),
-                              _buildDisplayField(
-                                'Services',
-                                businessProfile!['services'],
-                                icon: LucideIcons.briefcase,
-                              ),
-                              _buildDisplayField(
-                                'Products',
-                                businessProfile!['products'],
-                                icon: LucideIcons.package,
-                              ),
-                              _buildDisplayField(
-                                'Website URL',
-                                businessProfile!['weburl'],
-                                icon: LucideIcons.globe,
-                                onTap: () => _launchUrl(businessProfile!['weburl'] ?? ''),
-                              ),
-                              const SizedBox(height: 16.0),
-                              Text(
-                                'Social Links',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 12.0),
-                              Wrap(
-                                spacing: 12.0,
-                                runSpacing: 10.0,
-                                children: [
-                                  _buildSocialIconButton(LucideIcons.facebook, Colors.blue[700]!,
-                                      businessProfile!['fblink'] ?? '', 'Facebook'),
-                                  _buildSocialIconButton(LucideIcons.instagram, Colors.purple[700]!,
-                                      businessProfile!['instalink'] ?? '', 'Instagram'),
-                                  _buildSocialIconButton(LucideIcons.send, Colors.lightBlue[700]!,
-                                      businessProfile!['tellink'] ?? '', 'Telegram'),
-                                  _buildSocialIconButton(LucideIcons.linkedin, Colors.blue[900]!,
-                                      businessProfile!['lilink'] ?? '', 'LinkedIn'),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
     );
   }
