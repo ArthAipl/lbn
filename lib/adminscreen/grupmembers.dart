@@ -166,8 +166,8 @@ class _MemberDetailPageState extends State<MemberDetailPage> with SingleTickerPr
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Enter Group ID', style: TextStyle(fontWeight: FontWeight.bold)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Enter Group ID', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
         content: TextField(
           controller: _groupIdController,
           style: const TextStyle(color: Colors.black),
@@ -186,7 +186,7 @@ class _MemberDetailPageState extends State<MemberDetailPage> with SingleTickerPr
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -208,7 +208,7 @@ class _MemberDetailPageState extends State<MemberDetailPage> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
@@ -291,64 +291,102 @@ class _MemberDetailPageState extends State<MemberDetailPage> with SingleTickerPr
   }
 
   Widget _buildMemberCard(dynamic member, String? memberId) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+    return GestureDetector(
+      onTap: () {
+        if (memberId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BusinessProfilePage(memberId: memberId),
             ),
-          ],
-        ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(16),
-          leading: CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.black12,
-            child: Text(
-              member['Name']?.isNotEmpty == true ? member['Name'][0].toUpperCase() : '?',
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cannot view business profile: Member ID missing')),
+          );
+        }
+      },
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.white, Colors.grey[50]!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-            ),
-          ),
-          title: Text(
-            member['Name'] ?? 'Unknown',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-              Text('Email: ${member['email'] ?? 'N/A'}', style: TextStyle(color: Colors.grey[600])),
-              const SizedBox(height: 4),
-              Text('Number: ${member['number'] ?? 'N/A'}', style: TextStyle(color: Colors.grey[600])),
+              BoxShadow(
+                color: Colors.white.withOpacity(0.5),
+                blurRadius: 10,
+                offset: const Offset(-2, -2),
+              ),
             ],
           ),
-          trailing: const Icon(LucideIcons.chevronRight, color: Colors.black54),
-          onTap: () {
-            if (memberId != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => BusinessProfilePage(memberId: memberId),
+          child: Stack(
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.all(20),
+                leading: CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.black.withOpacity(0.1),
+                  child: Text(
+                    member['Name']?.isNotEmpty == true ? member['Name'][0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      color: Colors.black87,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Cannot view business profile: Member ID missing')),
-              );
-            }
-          },
+                title: Text(
+                  member['Name'] ?? 'Unknown',
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    Text(
+                      'Email: ${member['email'] ?? 'N/A'}',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Number: ${member['number'] ?? 'N/A'}',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    ),
+                  ],
+                ),
+                trailing: const Icon(LucideIcons.chevronRight, color: Colors.black54, size: 28),
+              ),
+              Positioned(
+                bottom: 8,
+                left: 0,
+                right: 0,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Text(
+                    'Tap to view Business Profile',
+                    style: TextStyle(
+                      color: Colors.black.withOpacity(0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -361,18 +399,38 @@ class _MemberDetailPageState extends State<MemberDetailPage> with SingleTickerPr
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: Card(
-            elevation: 5,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.white, Colors.grey[50]!],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: Colors.white.withOpacity(0.5),
+                    blurRadius: 10,
+                    offset: const Offset(-2, -2),
+                  ),
+                ],
+              ),
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(LucideIcons.network, size: 80, color: Colors.black),
+                  const Icon(LucideIcons.network, size: 80, color: Colors.black87),
                   const SizedBox(height: 16),
                   const Text(
                     'Enter Group ID',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -406,6 +464,7 @@ class _MemberDetailPageState extends State<MemberDetailPage> with SingleTickerPr
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 2,
                       ),
                       child: isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
@@ -430,7 +489,7 @@ class _MemberDetailPageState extends State<MemberDetailPage> with SingleTickerPr
   }
 }
 
-// BusinessProfilePage with Pull-to-Refresh and Removed Visit Website Button
+// BusinessProfilePage
 class BusinessProfilePage extends StatefulWidget {
   final String memberId;
 
@@ -548,14 +607,22 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> with SingleTi
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  gradient: LinearGradient(
+                    colors: [Colors.white, Colors.grey[50]!],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[200]!),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withOpacity(0.1),
                       blurRadius: 6,
                       offset: const Offset(0, 3),
+                    ),
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.5),
+                      blurRadius: 6,
+                      offset: const Offset(-2, -2),
                     ),
                   ],
                 ),
@@ -596,13 +663,21 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> with SingleTi
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white,
-              border: Border.all(color: color.withOpacity(0.4)),
+              gradient: LinearGradient(
+                colors: [Colors.white, color.withOpacity(0.1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: color.withOpacity(0.2),
                   blurRadius: 6,
                   offset: const Offset(0, 3),
+                ),
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.5),
+                  blurRadius: 6,
+                  offset: const Offset(-2, -2),
                 ),
               ],
             ),
@@ -618,7 +693,7 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> with SingleTi
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.grey[100],
         appBar: AppBar(
           backgroundColor: Colors.black,
           elevation: 0,
@@ -699,7 +774,7 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> with SingleTi
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
-                          // Hero Section (Visit Website Button Removed)
+                          // Hero Section
                           FadeTransition(
                             opacity: _fadeAnimation,
                             child: Container(
@@ -719,7 +794,11 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> with SingleTi
                                               width: 100,
                                               decoration: BoxDecoration(
                                                 shape: BoxShape.circle,
-                                                color: Colors.grey[200],
+                                                gradient: LinearGradient(
+                                                  colors: [Colors.grey[200]!, Colors.grey[300]!],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                ),
                                               ),
                                               child: Icon(LucideIcons.imageOff, size: 50, color: Colors.grey[400]),
                                             ),
@@ -729,7 +808,11 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> with SingleTi
                                             width: 100,
                                             decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: Colors.grey[200],
+                                              gradient: LinearGradient(
+                                                colors: [Colors.grey[200]!, Colors.grey[300]!],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
                                             ),
                                             child: Icon(LucideIcons.imageOff, size: 50, color: Colors.grey[400]),
                                           ),
@@ -759,17 +842,26 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> with SingleTi
                                   child: FadeTransition(
                                     opacity: _fadeAnimation,
                                     child: Card(
-                                      elevation: 3,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(16),
+                                          gradient: LinearGradient(
+                                            colors: [Colors.white, Colors.grey[50]!],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                          borderRadius: BorderRadius.circular(20),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(0.05),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 3),
+                                              color: Colors.black.withOpacity(0.1),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                            BoxShadow(
+                                              color: Colors.white.withOpacity(0.5),
+                                              blurRadius: 10,
+                                              offset: const Offset(-2, -2),
                                             ),
                                           ],
                                         ),
@@ -809,17 +901,26 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> with SingleTi
                                   child: FadeTransition(
                                     opacity: _fadeAnimation,
                                     child: Card(
-                                      elevation: 3,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(16),
+                                          gradient: LinearGradient(
+                                            colors: [Colors.white, Colors.grey[50]!],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                          borderRadius: BorderRadius.circular(20),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(0.05),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 3),
+                                              color: Colors.black.withOpacity(0.1),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                            BoxShadow(
+                                              color: Colors.white.withOpacity(0.5),
+                                              blurRadius: 10,
+                                              offset: const Offset(-2, -2),
                                             ),
                                           ],
                                         ),
