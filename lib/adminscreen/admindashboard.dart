@@ -38,8 +38,8 @@ enum Feature {
   circleMeeting,
   committeeMembers,
   profile,
-  visitors, // Added new feature
-  references // Added new feature
+  visitors,
+  references
 }
 
 class AdminDashboard extends StatefulWidget {
@@ -117,11 +117,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         final jsonData = jsonDecode(response.body);
         if (jsonData is List) {
           final groups = jsonData.map((json) => Group.fromJson(json)).toList();
-          // Changed to nullable Group? to handle case where no group is found
           final Group? group = groups.isNotEmpty
               ? groups.firstWhere(
                   (g) => g.gId == gId,
-                  orElse: () => Group(gId: gId, groupName: ''), // Return a default Group
+                  orElse: () => Group(gId: gId, groupName: ''),
                 )
               : null;
           if (group != null && mounted) {
@@ -138,8 +137,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
               );
             }
           }
-        } else {
-          // Handle case where jsonData is not a List
         }
       } else {
         if (mounted) {
@@ -231,16 +228,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
           MaterialPageRoute(builder: (context) => const AdminProfilePage()),
         );
         break;
-      case Feature.visitors: // Handle new feature
-         Navigator.push(
+      case Feature.visitors:
+        Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const VisitorsAdmin()),
         );
         break;
-      case Feature.references: // Handle new feature
-         Navigator.push(
+      case Feature.references:
+        Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) =>  ReferencesAdmin()),
+          MaterialPageRoute(builder: (context) => const ReferencesAdmin()),
         );
         break;
     }
@@ -290,18 +287,61 @@ class _AdminDashboardState extends State<AdminDashboard> {
       backgroundColor: Colors.white,
       child: SafeArea(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              children: [
-                _buildDrawerMenuItem(
-                  icon: Icons.person_outline,
-                  title: 'My Profile',
-                  onTap: () => _navigateToFeature(Feature.profile),
+            // Drawer Header with User Info
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF6C63FF), Color(0xFF5A52E8)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
-                // You can add more menu items here if needed
-              ],
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(16),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    userName.isNotEmpty ? userName : 'User Name',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    userEmail.isNotEmpty ? userEmail : 'Email not available',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
+            // Menu Items as Cards
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Column(
+                  children: [
+                    _buildDrawerCard(
+                      title: 'My Profile',
+                      icon: Icons.person_outline,
+                      color: const Color(0xFF6C63FF),
+                      onTap: () => _navigateToFeature(Feature.profile),
+                    ),
+                    // Add more card items here if needed
+                  ],
+                ),
+              ),
+            ),
+            // Logout Button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               child: Container(
@@ -341,44 +381,55 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildDrawerMenuItem({
-    required IconData icon,
+  Widget _buildDrawerCard({
     required String title,
+    required IconData icon,
+    required Color color,
     required VoidCallback onTap,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: Colors.black,
-            size: 20,
-          ),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          color: Colors.black54,
-          size: 16,
-        ),
-        onTap: onTap,
-        shape: RoundedRectangleBorder(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E1E2C),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -403,7 +454,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   BoxShadow(
                     color: const Color(0xFF6C63FF).withOpacity(0.3),
                     blurRadius: 20,
-                    offset: const Offset(0, 8),
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -485,7 +536,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       {'title': 'Meetings', 'icon': Icons.meeting_room_rounded, 'color': Colors.orange, 'feature': Feature.meetings},
       {'title': 'One 2 One', 'icon': Icons.person_pin_rounded, 'color': Colors.purple, 'feature': Feature.oneToOne},
       {'title': 'Circle Meeting Registration', 'icon': Icons.event_available_rounded, 'color': Colors.teal, 'feature': Feature.circleMeeting},
-      // New additions
       {'title': 'Visitors', 'icon': Icons.visibility_rounded, 'color': Colors.red, 'feature': Feature.visitors},
       {'title': 'References', 'icon': Icons.link_rounded, 'color': Colors.pink, 'feature': Feature.references},
     ];
