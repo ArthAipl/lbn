@@ -18,6 +18,9 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
   late TextEditingController emailController;
   late TextEditingController numberController;
   late TextEditingController groupCodeController;
+  late TextEditingController groupNameController;
+  late TextEditingController shortGroupNameController;
+  late TextEditingController nameController;
   bool isSaving = false;
 
   @override
@@ -26,6 +29,9 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
     emailController = TextEditingController();
     numberController = TextEditingController();
     groupCodeController = TextEditingController();
+    groupNameController = TextEditingController();
+    shortGroupNameController = TextEditingController();
+    nameController = TextEditingController();
     fetchProfile();
   }
 
@@ -34,13 +40,16 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
     emailController.dispose();
     numberController.dispose();
     groupCodeController.dispose();
+    groupNameController.dispose();
+    shortGroupNameController.dispose();
+    nameController.dispose();
     super.dispose();
   }
 
   Future<void> fetchProfile() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final gId = prefs.getString('G_ID') ?? '461430';
+      final gId = prefs.getString('G_ID') ?? '1'; // Default to '1' for testing
 
       if (gId.isEmpty) {
         setState(() {
@@ -113,10 +122,14 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
             emailController.text = group['email']?.toString() ?? '';
             numberController.text = group['number']?.toString() ?? '';
             groupCodeController.text = group['Grop_code']?.toString() ?? '';
+            groupNameController.text = group['group_name']?.toString() ?? '';
+            shortGroupNameController.text = group['short_group_name']?.toString() ?? '';
+            nameController.text = group['name']?.toString() ?? '';
             isLoading = false;
           });
           if (kDebugMode) {
             print('Profile loaded: $profile');
+            print('Fetched G_ID: ${profile?['G_ID']}');
           }
         } else {
           setState(() {
@@ -128,8 +141,6 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
           }
           await clearPreferences();
           _showSnackBar('Invalid group ID. Please log in again.', isError: true);
-          // Optionally navigate to login screen
-          // Navigator.pushReplacementNamed(context, '/login');
         }
       } else {
         setState(() {
@@ -153,6 +164,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
   }
 
   Future<void> updateProfile() async {
+    // Validate input fields
     if (emailController.text.isEmpty ||
         !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(emailController.text)) {
       _showSnackBar('Please enter a valid email', isError: true);
@@ -170,38 +182,133 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
       return;
     }
 
+    if (groupNameController.text.isEmpty) {
+      _showSnackBar('Please enter a valid group name', isError: true);
+      if (kDebugMode) {
+        print('Validation Error: Invalid group name');
+      }
+      return;
+    }
+
+    if (shortGroupNameController.text.isEmpty) {
+      _showSnackBar('Please enter a valid short group name', isError: true);
+      if (kDebugMode) {
+        print('Validation Error: Invalid short group name');
+      }
+      return;
+    }
+
+    if (nameController.text.isEmpty) {
+      _showSnackBar('Please enter a valid name', isError: true);
+      if (kDebugMode) {
+        print('Validation Error: Invalid name');
+      }
+      return;
+    }
+
     setState(() {
       isSaving = true;
     });
 
     try {
-      final response = await http.post(
-        Uri.parse('https://tagai.caxis.ca/public/api/group-master/update'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'Grop_code': profile?['Grop_code']?.toString(),
-          'email': emailController.text,
-          'number': numberController.text,
-        }),
+      final prefs = await SharedPreferences.getInstance();
+      final gId = prefs.getString('G_ID') ?? '';
+
+      if (gId.isEmpty) {
+        _showSnackBar('Invalid group ID. Please log in again.', isError: true);
+        setState(() {
+          isSaving = false;
+        });
+        return;
+      }
+
+      // Prepare the update payload
+      final updateData = {
+        'G_ID': gId,
+        'email': emailController.text,
+        'number': numberController.text,
+        'group_name': groupNameController.text,
+        'short_group_name': shortGroupNameController.text,
+        'name': nameController.text,
+      };
+
+      if (kDebugMode) {
+        print('Update Request Payload: ${jsonEncode(updateData)}');
+      }
+
+      // Try PUT request with G_ID in the URL
+      final response = await http.put(
+        Uri.parse('https://tagai.caxis.ca/public/api/group-master/$gId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(updateData),
       );
 
       if (kDebugMode) {
-        print('Update Request: ${{
-          'Grop_code': profile?['Grop_code']?.toString(),
-          'email': emailController.text,
-          'number': numberController.text,
-        }}');
         print('Update Response: ${response.statusCode} - ${response.body}');
       }
 
-      if (response.statusCode == 200) {
-        setState(() {
-          profile?['email'] = emailController.text;
-          profile?['number'] = numberController.text;
-        });
-        _showSnackBar('Profile updated successfully', isError: false);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Parse response to ensure it’s valid
+        try {
+          final responseData = jsonDecode(response.body);
+          if (kDebugMode) {
+            print('Parsed Update Response: $responseData');
+          }
+
+          // Update local profile data
+          setState(() {
+            profile?['email'] = emailController.text;
+            profile?['number'] = numberController.text;
+            profile?['group_name'] = groupNameController.text;
+            profile?['short_group_name'] = shortGroupNameController.text;
+            profile?['Grop_code'] = groupCodeController.text;
+            profile?['name'] = nameController.text;
+          });
+
+          // Update SharedPreferences
+          await prefs.setString('email', emailController.text);
+          await prefs.setString('number', numberController.text);
+          await prefs.setString('group_name', groupNameController.text);
+          await prefs.setString('short_group_name', shortGroupNameController.text);
+          await prefs.setString('Grop_code', groupCodeController.text);
+          await prefs.setString('name', nameController.text);
+
+          _showSnackBar('Profile updated successfully', isError: false);
+        } catch (e) {
+          _showSnackBar('Error parsing update response: $e', isError: true);
+          if (kDebugMode) {
+            print('Parse Error: $e');
+          }
+        }
       } else {
-        _showSnackBar('Failed to update profile', isError: true);
+        // Handle specific status codes
+        String errorMessage = 'Failed to update profile: ${response.statusCode}';
+        try {
+          final errorData = jsonDecode(response.body);
+          errorMessage = errorData['message'] ?? errorMessage;
+          if (errorData['error'] != null) {
+            errorMessage += ' - ${errorData['error']}';
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error parsing error response: $e');
+          }
+        }
+
+        if (response.statusCode == 500) {
+          errorMessage = 'Server error: $errorMessage. Please verify G_ID ($gId) exists in the database.';
+        } else if (response.statusCode == 404) {
+          errorMessage = 'Update endpoint not found. Tried: https://tagai.caxis.ca/public/api/group-master/$gId';
+        } else if (response.statusCode == 422) {
+          errorMessage = 'Validation error on server. Please check input data.';
+        } else if (response.statusCode == 405) {
+          errorMessage = 'Method not allowed. Try PATCH instead of PUT or check the endpoint.';
+        }
+
+        _showSnackBar(errorMessage, isError: true);
         if (kDebugMode) {
           print('Update Error: Status ${response.statusCode} - ${response.body}');
         }
@@ -230,6 +337,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
       await prefs.remove('role_id');
       await prefs.remove('group_name');
       await prefs.remove('short_group_name');
+      await prefs.remove('name');
       if (kDebugMode) {
         print('Shared preferences cleared');
       }
@@ -238,6 +346,9 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
         emailController.clear();
         numberController.clear();
         groupCodeController.clear();
+        groupNameController.clear();
+        shortGroupNameController.clear();
+        nameController.clear();
         isLoading = true;
         error = null;
       });
@@ -280,14 +391,14 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
         controller: controller,
         enabled: enabled,
         keyboardType: keyboardType,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 16,
-          color: enabled ? Colors.black : Colors.grey[600],
+          color: Colors.black,
         ),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(
-            color: Colors.grey[700],
+          labelStyle: const TextStyle(
+            color: Colors.black,
             fontSize: 14,
           ),
           prefixIcon: Icon(
@@ -296,7 +407,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
             size: 22,
           ),
           filled: true,
-          fillColor: enabled ? Colors.white : Colors.grey[100],
+          fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
@@ -315,42 +426,6 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(String title, String value) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.black,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -391,13 +466,13 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                         Icon(
                           Icons.error_outline,
                           size: 64,
-                          color: Colors.grey[400],
+                          color: Colors.black,
                         ),
                         const SizedBox(height: 16),
                         Text(
                           error!,
-                          style: TextStyle(
-                            color: Colors.grey[600],
+                          style: const TextStyle(
+                            color: Colors.black,
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
@@ -427,159 +502,170 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                   ? Center(
                       child: Text(
                         'No profile data available',
-                        style: TextStyle(
-                          color: Colors.grey[600],
+                        style: const TextStyle(
+                          color: Colors.black,
                           fontSize: 16,
                         ),
                       ),
                     )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Profile Header
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
+                  : RefreshIndicator(
+                      onRefresh: fetchProfile,
+                      color: Colors.black,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Profile Header
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF6C63FF), Color(0xFF5A52E8)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                              ],
-                            ),
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 80,
-                                  height: 80,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black,
-                                    borderRadius: BorderRadius.circular(40),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 2),
                                   ),
-                                  child: const Icon(
-                                    Icons.person,
-                                    color: Colors.white,
-                                    size: 40,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  profile!['name']?.toString() ?? 'N/A',
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  profile!['group_name']?.toString() ?? 'N/A',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          // Group Information
-                          const Text(
-                            'Group Information',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildInfoCard(
-                            'SHORT GROUP NAME',
-                            profile!['short_group_name']?.toString() ?? 'N/A',
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          // Contact Information
-                          const Text(
-                            'Contact Information',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          _buildTextField(
-                            controller: emailController,
-                            label: 'Email Address',
-                            icon: Icons.email_outlined,
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-
-                          _buildTextField(
-                            controller: numberController,
-                            label: 'Phone Number',
-                            icon: Icons.phone_outlined,
-                            keyboardType: TextInputType.phone,
-                          ),
-
-                          _buildTextField(
-                            controller: groupCodeController,
-                            label: 'Group Code',
-                            icon: Icons.code_outlined,
-                            enabled: false,
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          // Save Button
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: isSaving ? null : updateProfile,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.black,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
+                                ],
                               ),
-                              child: isSaving
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
+                              child: Column(
+                                children: [
+                                  Text(
+                                    profile!['name']?.toString() ?? 'N/A',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    profile!['group_name']?.toString() ?? 'N/A',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            // Group Information
+                            const Text(
+                              'Group Information',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildTextField(
+                              controller: nameController,
+                              label: 'Name',
+                              icon: Icons.person_outlined,
+                              enabled: true,
+                            ),
+
+                            _buildTextField(
+                              controller: shortGroupNameController,
+                              label: 'Short Group Name',
+                              icon: Icons.group_outlined,
+                              enabled: true,
+                            ),
+
+                            _buildTextField(
+                              controller: groupNameController,
+                              label: 'Group Name',
+                              icon: Icons.group_outlined,
+                              enabled: true,
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            // Contact Information
+                            const Text(
+                              'Contact Information',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            _buildTextField(
+                              controller: emailController,
+                              label: 'Email Address',
+                              icon: Icons.email_outlined,
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+
+                            _buildTextField(
+                              controller: numberController,
+                              label: 'Phone Number',
+                              icon: Icons.phone_outlined,
+                              keyboardType: TextInputType.phone,
+                            ),
+
+                            _buildTextField(
+                              controller: groupCodeController,
+                              label: 'Group Code',
+                              icon: Icons.code_outlined,
+                              enabled: false,
+                            ),
+
+                            const SizedBox(height: 32),
+
+                            // Save Button
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: isSaving ? null : updateProfile,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: isSaving
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Save',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
-                                    )
-                                  : const Text(
-                                      'Save Changes',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                              ),
                             ),
-                          ),
 
-                          const SizedBox(height: 20),
-                        ],
+                            const SizedBox(height: 20),
+                          ],
+                        ),
                       ),
                     ),
     );

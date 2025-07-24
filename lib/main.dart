@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lbn/screens/getstartedscreen.dart';
 import 'package:lbn/screens/spalshscreen.dart';
+import 'package:lbn/adminscreen/admindashboard.dart';
+import 'package:lbn/userscreens/userdashboard.dart';
 
 void main() {
   runApp(const LBNApp());
@@ -16,12 +18,14 @@ class LBNApp extends StatelessWidget {
       title: 'LBN Business Network',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        textTheme: GoogleFonts.poppinsTextTheme(), // Set Poppins globally
-        useMaterial3: true, // Optional: Enables Material 3
+        textTheme: GoogleFonts.poppinsTextTheme(),
+        useMaterial3: true,
       ),
       home: const SplashScreen(),
       routes: {
         '/get-started': (context) => const GetStartedScreen(),
+        '/admin-dashboard': (context) => const AdminDashboard(),
+        '/user-dashboard': (context) => const UserDashboard(),
       },
       debugShowCheckedModeBanner: false,
     );

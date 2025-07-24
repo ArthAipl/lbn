@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lbn/adminscreen/meetingsadmin.dart';
 import 'package:lbn/screens/loginscreen.dart';
 import 'package:lbn/screens/settingslbn.dart';
@@ -11,7 +14,6 @@ import 'package:lbn/userscreens/onetwooone.dart';
 import 'package:lbn/userscreens/refrencessuser.dart';
 import 'package:lbn/userscreens/usermembers.dart';
 import 'package:lbn/userscreens/visitorsusers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class UserDashboard extends StatefulWidget {
   const UserDashboard({super.key});
@@ -23,6 +25,93 @@ class UserDashboard extends StatefulWidget {
 class _UserDashboardState extends State<UserDashboard> {
   int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  String? memberName;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMemberName();
+    _setLastDashboard();
+  }
+
+  Future<void> _setLastDashboard() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_dashboard', 'user');
+    } catch (e) {
+      debugPrint('Error setting last dashboard: $e');
+    }
+  }
+
+  Future<void> _fetchMemberName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? mId = prefs.getString('M_ID');
+
+      if (mId == null || mId.isEmpty) {
+        setState(() {
+          memberName = 'User';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No M_ID found in SharedPreferences')),
+        );
+        return;
+      }
+
+      final response = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/member'));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> decodedResponse = json.decode(response.body);
+
+        if (decodedResponse.containsKey('members') && decodedResponse['members'] is List) {
+          final List<dynamic> members = decodedResponse['members'];
+          final member = members.firstWhere(
+            (member) {
+              if (member is Map<String, dynamic>) {
+                return member['M_ID'].toString() == mId;
+              }
+              return false;
+            },
+            orElse: () => null,
+          );
+
+          if (member != null && member is Map<String, dynamic>) {
+            setState(() {
+              memberName = member['Name']?.toString() ?? 'User';
+            });
+          } else {
+            setState(() {
+              memberName = 'User';
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Member not found in API response')),
+            );
+          }
+        } else {
+          setState(() {
+            memberName = 'User';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invalid API response format: No members list')),
+          );
+        }
+      } else {
+        setState(() {
+          memberName = 'User';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to fetch member data: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        memberName = 'User';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching member name: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +208,7 @@ class _UserDashboardState extends State<UserDashboard> {
     bool isLogout = false,
   }) {
     bool isSelected = _selectedIndex == index;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       child: Material(
@@ -179,7 +268,7 @@ class _UserDashboardState extends State<UserDashboard> {
               if (confirm == true) {
                 try {
                   final prefs = await SharedPreferences.getInstance();
-                  await prefs.clear(); // Clears all SharedPreferences data
+                  await prefs.clear();
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -223,8 +312,8 @@ class _UserDashboardState extends State<UserDashboard> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isSelected 
-                        ? iconColor.withOpacity(0.2) 
+                    color: isSelected
+                        ? iconColor.withOpacity(0.2)
                         : iconColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -291,19 +380,19 @@ class _UserDashboardState extends State<UserDashboard> {
                     ),
                   ],
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Welcome back!',
-                      style: TextStyle(
+                      'Welcome back, ${memberName ?? 'Loading...'}!',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                    SizedBox(height: 8),
-                    Text(
+                    const SizedBox(height: 8),
+                    const Text(
                       'Ready to network?',
                       style: TextStyle(
                         color: Colors.white,

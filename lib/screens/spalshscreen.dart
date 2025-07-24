@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,17 +21,17 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _scaleController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    
+
     _rippleController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
@@ -39,17 +40,17 @@ class _SplashScreenState extends State<SplashScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
-    
+
     _rippleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _rippleController, curve: Curves.easeOut),
     );
 
     _startAnimations();
-    _navigateToGetStarted();
+    _checkUserAndNavigate();
   }
 
   void _startAnimations() {
@@ -62,10 +63,34 @@ class _SplashScreenState extends State<SplashScreen>
     });
   }
 
-  void _navigateToGetStarted() {
-    Timer(const Duration(seconds: 2), () {
+  Future<void> _checkUserAndNavigate() async {
+    // Wait for 2 seconds to show the splash screen
+    await Future.delayed(const Duration(seconds: 2));
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? userEmail = prefs.getString('email');
+      final String? lastDashboard = prefs.getString('last_dashboard');
+
+      if (userEmail != null && userEmail.isNotEmpty) {
+        // User is logged in, check last dashboard
+        if (lastDashboard == 'admin') {
+          Navigator.of(context).pushReplacementNamed('/admin-dashboard');
+        } else if (lastDashboard == 'user') {
+          Navigator.of(context).pushReplacementNamed('/user-dashboard');
+        } else {
+          // Default to GetStartedScreen if last_dashboard is not set
+          Navigator.of(context).pushReplacementNamed('/get-started');
+        }
+      } else {
+        // No user logged in, go to GetStartedScreen
+        Navigator.of(context).pushReplacementNamed('/get-started');
+      }
+    } catch (e) {
+      // Handle any errors and fallback to GetStartedScreen
+      debugPrint('Error checking user data: $e');
       Navigator.of(context).pushReplacementNamed('/get-started');
-    });
+    }
   }
 
   @override

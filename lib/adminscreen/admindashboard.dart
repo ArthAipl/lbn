@@ -30,6 +30,7 @@ class Group {
 
 // Enum for feature navigation to prevent dynamic type issues
 enum Feature {
+  dashboard,
   requests,
   members,
   events,
@@ -53,21 +54,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
   String userName = '';
   String userEmail = '';
   String groupCode = '';
-  String groupName = '';
   String gId = '';
+  String groupName = '';
   bool isLoading = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Sample stats (consider fetching from API if dynamic)
-  final Map<String, int> stats = {
-    'Events This Month': 8,
-    'Active Projects': 12,
-  };
+  // Track the currently selected feature for drawer highlighting
+  Feature _currentFeature = Feature.dashboard;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _setLastDashboard();
+  }
+
+  Future<void> _setLastDashboard() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_dashboard', 'admin');
+    } catch (e) {
+      debugPrint('Error setting last dashboard: $e');
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -177,7 +185,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   void _navigateToFeature(Feature feature) {
     _scaffoldKey.currentState?.closeDrawer();
+    setState(() {
+      _currentFeature = feature;
+    });
+
     switch (feature) {
+      case Feature.dashboard:
+        break;
       case Feature.requests:
         Navigator.push(
           context,
@@ -247,7 +261,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget build(BuildContext context) {
     if (isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xFF1E1E2C),
+        backgroundColor: Color.fromARGB(255, 0, 0, 0),
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFF6C63FF)),
         ),
@@ -282,34 +296,58 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  Widget _buildDrawerItem({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+    bool isSelected = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+      child: ListTile(
+        leading: Icon(icon, color: isSelected ? const Color(0xFF6C63FF) : Colors.grey[700]),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFF6C63FF) : Colors.grey[800],
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 15,
+          ),
+        ),
+        onTap: onTap,
+        selected: isSelected,
+        selectedTileColor: const Color(0xFF6C63FF).withOpacity(0.1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+      ),
+    );
+  }
+
   Widget _buildProfessionalDrawer() {
     return Drawer(
       backgroundColor: Colors.white,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Drawer Header with User Info
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF6C63FF), Color(0xFF5A52E8)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(16),
-                ),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6C63FF), Color(0xFF5A52E8)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
+            ),
+            child: SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const SizedBox(height: 16),
                   Text(
                     userName.isNotEmpty ? userName : 'User Name',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -324,112 +362,54 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ],
               ),
             ),
-            // Menu Items as Cards
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Column(
-                  children: [
-                    _buildDrawerCard(
-                      title: 'My Profile',
-                      icon: Icons.person_outline,
-                      color: const Color(0xFF6C63FF),
-                      onTap: () => _navigateToFeature(Feature.profile),
-                    ),
-                    // Add more card items here if needed
-                  ],
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              children: [
+                _buildDrawerItem(
+                  title: 'My Profile',
+                  icon: Icons.person_outline,
+                  onTap: () => _navigateToFeature(Feature.profile),
+                  isSelected: _currentFeature == Feature.profile,
                 ),
-              ),
+              ],
             ),
-            // Logout Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              child: Container(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showLogoutDialog();
-                  },
-                  icon: const Icon(
-                    Icons.logout_rounded,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showLogoutDialog();
+                },
+                icon: const Icon(
+                  Icons.logout_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                label: const Text(
+                  'Logout',
+                  style: TextStyle(
                     color: Colors.white,
-                    size: 20,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
-                  label: const Text(
-                    'Logout',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
+                  elevation: 2,
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawerCard({
-    required String title,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1E1E2C),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -441,63 +421,66 @@ class _AdminDashboardState extends State<AdminDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6C63FF), Color(0xFF5A52E8)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+            GestureDetector(
+              onTap: () => _navigateToFeature(Feature.profile),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6C63FF), Color(0xFF5A52E8)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6C63FF).withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF6C63FF).withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          userName.isNotEmpty
-                              ? 'Welcome back, $userName! ${groupName.isNotEmpty ? '($groupName)' : ''}'
-                              : 'Welcome back! ${groupName.isNotEmpty ? '($groupName)' : ''}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userName.isNotEmpty
+                                ? 'Welcome back, $userName! ${groupName.isNotEmpty ? '($groupName)' : ''}'
+                                : 'Welcome back! ${groupName.isNotEmpty ? '($groupName)' : ''}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Here\'s what\'s happening in your network today',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.9),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Here\'s what\'s happening in your network today',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.dashboard,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.dashboard,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -564,7 +547,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildCommitteeMembersGrid() {
     final committeeMembers = [
       {'title': 'Secretary', 'icon': Icons.description_rounded, 'color': Colors.orange, 'feature': Feature.committeeMembers},
-      {'title': 'Treasurer', 'icon': Icons.settings, 'color': Colors.purple, 'feature': Feature.committeeMembers},
+      {'title': 'Treasurer', 'icon': Icons.account_balance_wallet_rounded, 'color': Colors.purple, 'feature': Feature.committeeMembers},
     ];
     return GridView.builder(
       shrinkWrap: true,
