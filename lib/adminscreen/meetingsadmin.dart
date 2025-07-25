@@ -153,7 +153,7 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
   Widget build(BuildContext context) {
     debugPrint('Building MeetingAdminPage, isLoading: $isLoading, gId: $gId');
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.black,
@@ -163,7 +163,7 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.grey[400],
+          unselectedLabelColor: Colors.white,
           indicatorColor: Colors.white,
           indicatorWeight: 3,
           tabs: const [
@@ -681,7 +681,7 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> with SingleTick
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
@@ -693,7 +693,7 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> with SingleTick
         bottom: TabBar(
           controller: _detailTabController,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.grey[400],
+          unselectedLabelColor: Colors.white,
           indicatorColor: Colors.white,
           indicatorWeight: 3,
           tabs: const [
@@ -819,13 +819,13 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> with SingleTick
                                   trailing: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: visitor['Status'] == 'Confirmed' ? Colors.green[100] : Colors.grey[200],
+                                      color: visitor['Status'] == 'Confirmed' ? Colors.green[100] : Colors.white,
                                       borderRadius: BorderRadius.circular(5),
                                     ),
                                     child: Text(
                                       visitor['Status'] ?? 'Pending',
                                       style: TextStyle(
-                                        color: visitor['Status'] == 'Confirmed' ? Colors.green[800] : Colors.grey[800],
+                                        color: visitor['Status'] == 'Confirmed' ? Colors.green[800] : Colors.white,
                                         fontSize: 12,
                                       ),
                                     ),

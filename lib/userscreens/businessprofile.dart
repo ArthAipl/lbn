@@ -986,19 +986,8 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
-            fontWeight: FontWeight.bold,
           ),
         ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: _pickImage,
-            icon: const Icon(
-              Icons.camera_alt,
-              color: Colors.white,
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -1331,7 +1320,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                 if (_fblinkController.text.isNotEmpty)
                   _buildSocialIcon(Icons.facebook, Colors.blue, _fblinkController.text, 'Facebook'),
                 if (_instalinkController.text.isNotEmpty)
-                  _buildSocialIcon(Icons.camera_alt, Colors.pink, _instalinkController.text, 'Instagram'),
+                  _buildSocialIcon(Icons.camera_alt, Colors.red, _instalinkController.text, 'Instagram'),
                 if (_lilinkController.text.isNotEmpty)
                   _buildSocialIcon(Icons.business, Colors.blue[800]!, _lilinkController.text, 'LinkedIn'),
                 if (_weburlController.text.isNotEmpty)

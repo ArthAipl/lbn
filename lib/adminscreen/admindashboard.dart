@@ -518,7 +518,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       {'title': 'Events', 'icon': Icons.event_rounded, 'color': Colors.green, 'feature': Feature.events},
       {'title': 'Meetings', 'icon': Icons.meeting_room_rounded, 'color': Colors.orange, 'feature': Feature.meetings},
       {'title': 'One 2 One', 'icon': Icons.person_pin_rounded, 'color': Colors.purple, 'feature': Feature.oneToOne},
-      {'title': 'Circle Meeting Registration', 'icon': Icons.event_available_rounded, 'color': Colors.teal, 'feature': Feature.circleMeeting},
+      {'title': 'Circle Meetings', 'icon': Icons.event_available_rounded, 'color': Colors.teal, 'feature': Feature.circleMeeting},
       {'title': 'Visitors', 'icon': Icons.visibility_rounded, 'color': Colors.red, 'feature': Feature.visitors},
       {'title': 'References', 'icon': Icons.link_rounded, 'color': Colors.pink, 'feature': Feature.references},
     ];

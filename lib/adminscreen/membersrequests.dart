@@ -279,10 +279,6 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
                 value: 2,
                 child: Text('Show Rejected Members'),
               ),
-              const PopupMenuItem(
-                value: -2,
-                child: Text('Logout'),
-              ),
             ],
           ),
         ],

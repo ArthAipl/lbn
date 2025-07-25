@@ -18,7 +18,7 @@ class LBNApp extends StatelessWidget {
       title: 'LBN Business Network',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        textTheme: GoogleFonts.poppinsTextTheme(),
+        textTheme: GoogleFonts.robotoTextTheme(),
         useMaterial3: true,
       ),
       home: const SplashScreen(),
