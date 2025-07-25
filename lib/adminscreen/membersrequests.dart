@@ -357,7 +357,7 @@ class _MemberApprovalScreenState extends State<MemberApprovalScreen> {
             const SizedBox(height: 16),
             Text(
               currentStatusFilter == 0
-                  ? 'No pending members to approve'
+                  ? 'No pending requests to approve'
                   : currentStatusFilter == 1
                       ? 'No approved members found'
                       : currentStatusFilter == 2
