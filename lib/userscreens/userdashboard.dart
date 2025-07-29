@@ -26,12 +26,16 @@ class _UserDashboardState extends State<UserDashboard> {
   int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String? memberName;
+  bool isReceptionCommitteeMember = false;
+  bool isAttendanceCommitteeMember = false;
+  bool isTreasurerCommitteeMember = false;
 
   @override
   void initState() {
     super.initState();
     _fetchMemberName();
     _setLastDashboard();
+    _checkCommitteeMemberStatus();
   }
 
   Future<void> _setLastDashboard() async {
@@ -109,6 +113,58 @@ class _UserDashboardState extends State<UserDashboard> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error fetching member name: $e')),
+      );
+    }
+  }
+
+  // Updated _checkCommitteeMemberStatus to check ServiceAreas and c_m_status
+  Future<void> _checkCommitteeMemberStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? mId = prefs.getString('M_ID');
+
+      if (mId == null || mId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No M_ID found in SharedPreferences')),
+        );
+        return;
+      }
+
+      final response = await http.get(Uri.parse('https://tagai.caxis.ca/public/api/comm-memb'));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> decodedResponse = json.decode(response.body);
+
+        setState(() {
+          // Reset flags
+          isReceptionCommitteeMember = false;
+          isAttendanceCommitteeMember = false;
+          isTreasurerCommitteeMember = false;
+
+          // Check for committee roles with c_m_status == "1"
+          for (var member in decodedResponse) {
+            if (member is Map<String, dynamic> &&
+                member['M_ID'].toString() == mId &&
+                member['c_m_status'] == '1') {
+              final serviceArea = member['designation']?['ServiceAreas'] as String?;
+              if (serviceArea == 'Reception') {
+                isReceptionCommitteeMember = true;
+              } else if (serviceArea == 'Attendance') {
+                isAttendanceCommitteeMember = true;
+              } else if (serviceArea == 'Treasurer') {
+                isTreasurerCommitteeMember = true;
+              }
+            }
+          }
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to fetch committee data: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error checking committee status: $e')),
       );
     }
   }
@@ -523,6 +579,48 @@ class _UserDashboardState extends State<UserDashboard> {
                   );
                 },
               ),
+              if (isReceptionCommitteeMember)
+                _buildFeatureCard(
+                  'Reception',
+                  'Committee tasks',
+                  Icons.support_agent_outlined,
+                  const Color(0xFF22D3EE),
+                  onTap: () {
+                    // Add navigation to Reception committee page if needed
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(builder: (context) => ReceptionCommitteePage()),
+                    // );
+                  },
+                ),
+              if (isAttendanceCommitteeMember)
+                _buildFeatureCard(
+                  'Attendance',
+                  'Track attendance',
+                  Icons.check_circle_outline,
+                  const Color(0xFF4B5563),
+                  onTap: () {
+                    // Add navigation to Attendance committee page if needed
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(builder: (context) => AttendanceCommitteePage()),
+                    // );
+                  },
+                ),
+              if (isTreasurerCommitteeMember)
+                _buildFeatureCard(
+                  'Treasurer',
+                  'Financial management',
+                  Icons.account_balance_outlined,
+                  const Color(0xFFD97706),
+                  onTap: () {
+                    // Add navigation to Treasurer committee page if needed
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(builder: (context) => TreasurerCommitteePage()),
+                    // );
+                  },
+                ),
             ]),
           ),
         ),

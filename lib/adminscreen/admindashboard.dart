@@ -4,6 +4,7 @@ import 'package:lbn/adminscreen/admincircle.dart';
 import 'package:lbn/adminscreen/adminonetoone.dart';
 import 'package:lbn/adminscreen/adminrefrences.dart';
 import 'package:lbn/adminscreen/adminvisitors.dart';
+import 'package:lbn/adminscreen/assigncommiteemember.dart';
 import 'package:lbn/adminscreen/eventsadmin.dart';
 import 'package:lbn/adminscreen/grupmembers.dart';
 import 'package:lbn/adminscreen/meetingsadmin.dart';
@@ -12,7 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lbn/adminscreen/adminprofilepage.dart';
 import 'package:lbn/screens/loginscreen.dart';
 import 'package:flutter/services.dart';
-import 'dart:convert';
+import 'dart:convert';// Added import for AssignCommitteeMemberPage
 
 // Model for Group data to ensure type safety
 class Group {
@@ -38,6 +39,7 @@ enum Feature {
   oneToOne,
   circleMeeting,
   committeeMembers,
+  assignCommitteeMember,
   profile,
   visitors,
   references
@@ -236,6 +238,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         );
         break;
+      case Feature.assignCommitteeMember:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AssignCommitteeMemberPage()),
+        );
+        break;
       case Feature.profile:
         Navigator.push(
           context,
@@ -373,6 +381,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   onTap: () => _navigateToFeature(Feature.profile),
                   isSelected: _currentFeature == Feature.profile,
                 ),
+                _buildDrawerItem(
+                  title: 'Assign Committee Member',
+                  icon: Icons.assignment_ind_rounded,
+                  onTap: () => _navigateToFeature(Feature.assignCommitteeMember),
+                  isSelected: _currentFeature == Feature.assignCommitteeMember,
+                ),
               ],
             ),
           ),
@@ -386,11 +400,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   Navigator.pop(context);
                   _showLogoutDialog();
                 },
-                icon: const Icon(
-                  Icons.logout_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
                 label: const Text(
                   'Logout',
                   style: TextStyle(
@@ -461,7 +470,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             'Here\'s what\'s happening in your network today',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white,
                             ),
                           ),
                         ],
@@ -546,8 +555,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildCommitteeMembersGrid() {
     final committeeMembers = [
-      {'title': 'Secretary', 'icon': Icons.description_rounded, 'color': Colors.orange, 'feature': Feature.committeeMembers},
-      {'title': 'Treasurer', 'icon': Icons.account_balance_wallet_rounded, 'color': Colors.purple, 'feature': Feature.committeeMembers},
+      {'title': 'Committee Member Management', 'icon': Icons.assignment_ind_rounded, 'color': Colors.cyan, 'feature': Feature.assignCommitteeMember},
     ];
     return GridView.builder(
       shrinkWrap: true,
@@ -556,7 +564,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.6,
+        childAspectRatio: 1.8,
       ),
       itemCount: committeeMembers.length,
       itemBuilder: (context, index) {
@@ -575,7 +583,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return GestureDetector(
       onTap: () => _navigateToFeature(feature),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -602,15 +610,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 size: 24,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1E1E2C),
+            const SizedBox(height: 4),
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: title == 'Committee Member Management'
+                      ? const Color.fromRGBO(29, 27, 32, 1.0)
+                      : const Color(0xFF1E1E2C),
+                ),
+                textAlign: TextAlign.center,
+                softWrap: true,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
