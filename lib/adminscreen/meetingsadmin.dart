@@ -36,50 +36,31 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
     debugPrint('Starting _loadUserData');
     try {
       final prefs = await SharedPreferences.getInstance();
-      debugPrint('Saving user data to SharedPreferences');
-      // TODO: Replace with actual API call to fetch user data
-      // Example:
-      // final userData = await fetchUserDataFromApi();
-      final userData = {
-        'name': 'John Doe',
-        'email': 'john.doe@example.com',
-        'number': '1234567890',
-        'group_code': 'GRP123',
-        'g_id': '1', // Set to '1' to match API response for testing
-        'role_id': '2', // Admin role
-        'm_id': 'member123', // Only used if role_id is '3'
-        'group_name': 'Aark Infosoft Pvt Ltd', // Match API response
-        'short_group_name': 'Aark', // Match API response
-      };
-      // Save user data to SharedPreferences
-      String roleId = userData['role_id']?.toString() ?? '';
-      String? mId = userData['m_id']?.toString();
-      await prefs.setString('Name', userData['name']?.toString() ?? '');
-      await prefs.setString('email', userData['email']?.toString() ?? '');
-      await prefs.setString('number', userData['number']?.toString() ?? '');
-      await prefs.setString('Grop_code', userData['group_code']?.toString() ?? '');
-      await prefs.setString('G_ID', userData['g_id']?.toString() ?? '');
-      await prefs.setString('role_id', roleId);
-      if (roleId == '3') {
-        await prefs.setString('M_ID', mId ?? '');
-        debugPrint('Saved M_ID: $mId for member role');
-      }
-      if (roleId == '2') {
-        await prefs.setString('group_name', userData['group_name']?.toString() ?? '');
-        await prefs.setString('short_group_name', userData['short_group_name']?.toString() ?? '');
-        debugPrint('Saved admin fields: group_name and short_group_name');
-      }
+      debugPrint('Retrieving user data from SharedPreferences');
+      // Retrieve user data from SharedPreferences (assuming set during login)
+      final name = prefs.getString('Name') ?? '';
+      final email = prefs.getString('email') ?? '';
+      final number = prefs.getString('number') ?? '';
+      final groupCode = prefs.getString('Grop_code') ?? '';
+      final gId = prefs.getString('G_ID');
+      final roleId = prefs.getString('role_id') ?? '';
+      final mId = prefs.getString('M_ID');
+      final groupName = prefs.getString('group_name') ?? '';
+      final shortGroupName = prefs.getString('short_group_name') ?? '';
+
       // Log all SharedPreferences for debugging
       final allKeys = prefs.getKeys();
       debugPrint('SharedPreferences contents:');
       for (var key in allKeys) {
         debugPrint('$key: ${prefs.getString(key)}');
       }
+
       setState(() {
-        gId = prefs.getString('G_ID');
+        this.gId = gId;
         debugPrint('Retrieved G_ID: $gId');
       });
-      if (gId == null) {
+
+      if (gId == null || gId.isEmpty) {
         debugPrint('Error: G_ID not found in SharedPreferences');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -91,6 +72,7 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
         });
         return;
       }
+
       debugPrint('G_ID found, proceeding to fetch meetings');
       await _fetchMeetings();
     } catch (e) {
@@ -117,6 +99,9 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         debugPrint('Parsed API response data: $data');
+        // Log all G_IDs in the response to help identify valid ones
+        final gIds = data.map((meeting) => meeting['G_ID']?.toString()).toSet().toList();
+        debugPrint('Available G_IDs in API response: $gIds');
         setState(() {
           meetings = data.where((meeting) {
             final meetingGId = meeting['G_ID']?.toString();
@@ -159,7 +144,6 @@ class _MeetingAdminPageState extends State<MeetingAdminPage> with SingleTickerPr
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: const Text('Meetings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        // No back arrow here as it's the root page
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
@@ -257,9 +241,20 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
   Future<void> _createMeeting() async {
     debugPrint('Attempting to create meeting');
     if (_formKey.currentState!.validate()) {
+      if (widget.gId == null || widget.gId!.isEmpty) {
+        debugPrint('Error: G_ID is null or empty');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Group ID is missing. Please log in again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       setState(() => isLoading = true);
       final meetingData = {
-        'G_ID': widget.gId,
+        'G_ID': int.tryParse(widget.gId!) ?? widget.gId, // Try integer, fallback to string
         'M_ID': null,
         'Meeting_Date': _dateController.text,
         'Meeting_Time': _timeController.text,
@@ -298,7 +293,17 @@ class _CreateMeetingTabState extends State<CreateMeetingTab> {
             widget.onMeetingCreated();
           }
         } else {
-          throw Exception('Failed to create meeting. Status: ${response.statusCode}, Body: ${response.body}');
+          final errorBody = jsonDecode(response.body);
+          final errorMessage = errorBody['message']?['G_ID']?.join(', ') ?? errorBody['error'] ?? 'Unknown error';
+          debugPrint('Error creating meeting: Status: ${response.statusCode}, Message: $errorMessage');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to create meeting: $errorMessage. Please verify the Group ID.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       } catch (e) {
         debugPrint('Error creating meeting: $e');
@@ -509,7 +514,7 @@ class AllMeetingsTab extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (context) => MeetingDetailsPage(
-                                meeting: meeting, // Pass the entire meeting object
+                                meeting: meeting,
                               ),
                             ),
                           );
@@ -590,7 +595,6 @@ class AllMeetingsTab extends StatelessWidget {
   }
 }
 
-// MeetingDetailsPage
 class MeetingDetailsPage extends StatefulWidget {
   final dynamic meeting;
   const MeetingDetailsPage({super.key, required this.meeting});
@@ -685,8 +689,8 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> with SingleTick
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), // Changed title to 'Details'
-        leading: IconButton( // Added iOS-style back arrow
+        title: const Text('Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
           onPressed: () => Navigator.pop(context),
         ),
@@ -792,7 +796,6 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> with SingleTick
             child: TabBarView(
               controller: _detailTabController,
               children: [
-                // Visitors Tab
                 isLoadingVisitors
                     ? const Center(child: CircularProgressIndicator())
                     : visitors.isEmpty
@@ -834,7 +837,6 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> with SingleTick
                               );
                             },
                           ),
-                // Presentations Tab
                 isLoadingPresentations
                     ? const Center(child: CircularProgressIndicator())
                     : presentations.isEmpty
@@ -844,12 +846,10 @@ class _MeetingDetailsPageState extends State<MeetingDetailsPage> with SingleTick
                             itemCount: presentations.length,
                             itemBuilder: (context, index) {
                               final presentation = presentations[index];
-                              final member = presentation['member']; // Access the nested 'member' object
-
+                              final member = presentation['member'];
                               final presenterName = member != null ? member['Name'] ?? 'Unknown Presenter' : 'Unknown Presenter';
                               final presenterEmail = member != null ? member['email'] ?? 'N/A' : 'N/A';
                               final presenterNumber = member != null ? member['number'] ?? 'N/A' : 'N/A';
-
                               return Card(
                                 margin: const EdgeInsets.symmetric(vertical: 8.0),
                                 elevation: 2,
